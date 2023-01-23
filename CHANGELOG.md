@@ -1,6 +1,6 @@
-# newrelic-install CHANGELOG
+# chef-install CHANGELOG
 
-This file is used to list changes made in each version of the newrelic-install cookbook.
+This file is used to list changes made in each version of the chef-install cookbook.
 
 ## 0.1.0
 

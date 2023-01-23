@@ -1,0 +1,136 @@
+---
+name: ci
+
+"on":
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  rspec:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Install Chef
+        uses: actionshub/chef-install@2.0.4
+      - name: Install Gems
+        run: chef gem install -N "${{ inputs.gems }}"
+        if: ${{ github.event.inputs.gems != '' }}
+        env:
+          CHEF_LICENSE: accept-no-persist
+      - name: Run RSpec
+        run: chef exec rspec -f j -o tmp/rspec_results.json -f p
+        env:
+          CHEF_LICENSE: accept-no-persist
+      - name: RSpec Report
+        uses: SonicGarden/rspec-report-action@v2.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          json-path: tmp/rspec_results.json
+        if: always()
+
+  cookstyle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Install Chef
+        uses: actionshub/chef-install@2.0.4
+      - name: Run Cookstyle
+        run: chef exec cookstyle --display-cop-names --extra-details
+        env:
+          CHEF_LICENSE: accept-no-persist
+
+  yamllint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Run yaml Lint
+        uses: actionshub/yamllint@v1.1.1
+
+  integration:
+    needs: [rspec, cookstyle, yamllint]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os:
+          - almalinux-8
+          - amazonlinux-2
+          - centos-7
+          - centos-stream-8
+          - debian-10
+          - debian-11
+          - fedora-latest
+          - opensuse-leap-15
+          - rockylinux-8
+          - ubuntu-1804
+          - ubuntu-2004
+        suite:
+          - default
+      fail-fast: false
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Install Chef
+        uses: actionshub/chef-install@main
+      - name: Dokken
+        uses: actionshub/test-kitchen@main
+        env:
+          CHEF_LICENSE: accept-no-persist
+          KITCHEN_LOCAL_YAML: kitchen.dokken.yml
+        with:
+          suite: ${{ matrix.suite }}
+          os: ${{ matrix.os }}
+
+  integration-windows:
+    needs: [rspec, cookstyle, yamllint]
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+        suite:
+          - windows
+      fail-fast: false
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Install Chef
+        uses: actionshub/chef-install@main
+      - name: test-kitchen
+        uses: actionshub/test-kitchen@main
+        env:
+          CHEF_LICENSE: accept-no-persist
+          KITCHEN_LOCAL_YAML: kitchen.exec.yml
+        with:
+          suite: ${{ matrix.suite }}
+          os: ${{ matrix.os }}
+
+  integration-macos:
+    needs: [rspec, cookstyle, yamllint]
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        os:
+          - macos-latest
+        suite:
+          - default
+      fail-fast: false
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Install Chef
+        uses: actionshub/chef-install@main
+      - name: test-kitchen
+        uses: actionshub/test-kitchen@main
+        env:
+          CHEF_LICENSE: accept-no-persist
+          KITCHEN_LOCAL_YAML: kitchen.exec.yml
+        with:
+          suite: ${{ matrix.suite }}
+          os: ${{ matrix.os }}

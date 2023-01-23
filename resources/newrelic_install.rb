@@ -5,7 +5,7 @@ unified_mode true
 
 property :new_relic_api_key,      String
 property :new_relic_account_id,   String
-property :targets, Array, default: %w[infrastructure-agent-installer logs-integration]
+property :targets, Array, default: %w(infrastructure-agent-installer logs-integration)
 property :env,                    Hash
 property :verbosity,              String
 property :timeout_seconds,        Integer, defaunt: 600
@@ -42,12 +42,12 @@ action_class do
   end
 
   def stringify_targets(targets)
-    targets = %w[infrastructure-agent-installer logs-integration] if targets.nil? || targets.empty?
+    targets = %w(infrastructure-agent-installer logs-integration) if targets.nil? || targets.empty?
     _ = " -n #{targets.join(',')}" unless targets.nil? || targets.empty?
   end
 
   def get_verbosity(verbosity)
-    verbosity_modes = %w[debug trace]
+    verbosity_modes = %w(debug trace)
     _ = " --#{verbosity}" if verbosity_modes.include? verbosity
   end
 

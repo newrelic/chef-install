@@ -5,6 +5,7 @@ unified_mode true
 
 property :new_relic_api_key,      String
 property :new_relic_account_id,   String
+property :new_relic_region,       String
 property :targets, Array, default: %w(infrastructure-agent-installer logs-integration)
 property :env,                    Hash
 property :verbosity,              String
@@ -37,8 +38,29 @@ end
 
 action_class do
   def check_required
-    raise 'Please specify your newrelic api key' if new_resource.new_relic_api_key.nil?
-    raise 'Please specify your newrelic account key' if new_resource.new_relic_account_id.nil?
+    if new_resource.new_relic_api_key.nil? || new_resource.new_relic_api_key.empty?
+      if ENV['NEW_RELIC_API_KEY'].nil? || ENV['NEW_RELIC_API_KEY'].empty?
+        raise 'Please specify your newrelic api key'
+      end
+    else
+      ENV['NEW_RELIC_API_KEY'] = new_resource.new_relic_api_key
+    end
+
+    if new_resource.new_relic_account_id.nil? || new_resource.new_relic_account_id.empty?
+      if ENV['NEW_RELIC_ACCOUNT_ID'].nil? || ENV['NEW_RELIC_ACCOUNT_ID'].empty?
+        raise 'Please specify your newrelic account key'
+      end
+    else
+      ENV['NEW_RELIC_ACCOUNT_ID'] = new_resource.new_relic_account_id
+    end
+
+    if new_resource.new_relic_region.nil? || new_resource.new_relic_region.empty?
+      if ENV['NEW_RELIC_REGION'].nil? || ENV['NEW_RELIC_REGION'].empty?
+        raise 'Please specify your newrelic region'
+      end
+    else
+      ENV['NEW_RELIC_REGION'] = new_resource.new_relic_region
+    end
   end
 
   def stringify_targets(targets)

@@ -1,12 +1,12 @@
-[![New Relic Experimental header](https://github.com/newrelic/opensource-website/raw/main/src/images/categories/Experimental.png)](https://opensource.newrelic.com/oss-category/#new-relic-experimental)
+[![Community header](https://github.com/newrelic/opensource-website/raw/main/src/images/categories/Community_Project.png)](https://opensource.newrelic.com/oss-category/#community-project)
 
-# newrelic-install cookbook for [Guided Install](https://docs.newrelic.com/docs/infrastructure/host-integrations/installation/new-relic-guided-install-overview/)
+# New Relic Chef Cookbook
 
-`newrelic-install` is a chef cookbook created using on New Relic CLI, and is currently in experimental phase.
+`newrelic-install` is a [Chef cookbook](https://supermarket.chef.io/cookbooks/newrelic-install) that will help you scale your New Relic Observability efforts. It uses the [New Relic CLI](https://github.com/newrelic/newrelic-cli) and [New Relic Open Installation repository](https://github.com/newrelic/open-install-library) to achieve this.
 
-Currently, we have included Linux and Windows support for New Relic's infrastructure and logs integrations.
+Currently, we have included Linux and Windows support for New Relic's Infrastructure and Logs integrations, with more agents and integrations following in the near future.
 
-### Note: Specific version of agent install is not supported, New Relic CLI will always install latest released version of agent.
+**Note: Installing specific versions of an agent is not supported, this cookbook will always install latest released version of a New Relic agent.**
 
 ## Installation
 

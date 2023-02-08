@@ -1,8 +1,8 @@
+---
 name: Release
 
 permissions: write-all
-on:
-  workflow_dispatch:
+on: workflow_dispatch
 
 jobs:
   pre_release:
@@ -15,7 +15,7 @@ jobs:
         uses: actionshub/chef-install@2.0.4
       - name: Create pem file
         run: echo "${{ secrets.newrelic_pem }}" > newrelic.pem
-        shell: bash 
+        shell: bash
       - name: Release
         run: knife supermarket share newrelic-install
         shell: bash

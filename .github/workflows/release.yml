@@ -1,8 +1,8 @@
+---
 name: Release
 
 permissions: write-all
-on:
-  workflow_dispatch:
+on: workflow_dispatch
 
 jobs:
   pre_release:

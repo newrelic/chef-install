@@ -5,9 +5,9 @@ maintainer 'newrelic'
 maintainer_email 'hzhao@newrelic.com'
 license 'All Rights Reserved'
 description 'Installs/Configures Newrelic agents using guided install through chef'
-source_url        'https://github.com/NRhzhao/chef-install'
-issues_url        'https://github.com/NRhzhao/chef-install/issues'
-version '0.1.8'
+source_url        'https://github.com/newrelic/chef-install'
+issues_url        'https://github.com/newrelic/chef-install/issues'
+version '0.1.9'
 chef_version '>= 15.0'
 
 # Platform support

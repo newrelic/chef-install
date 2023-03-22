@@ -49,8 +49,8 @@ The `newrelic_install` resource manages will instrument newrelic using guided in
 ```ruby
 newrelic_install 'install' do
   action                   :install
-  new_relic_api_key        node['newrelic_install']]['NEW_RELIC_API_KEY']
-  new_relic_account_id     node['newrelic_install']]['NEW_RELIC_ACCOUNT_ID']
+  new_relic_api_key        node['newrelic_install']['NEW_RELIC_API_KEY']
+  new_relic_account_id     node['newrelic_install']['NEW_RELIC_ACCOUNT_ID']
   env                      node['newrelic_install']['env']
 end
 ```

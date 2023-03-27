@@ -52,6 +52,7 @@ newrelic_install 'install' do
   new_relic_api_key        node['newrelic_install']['NEW_RELIC_API_KEY']
   new_relic_account_id     node['newrelic_install']['NEW_RELIC_ACCOUNT_ID']
   env                      node['newrelic_install']['env']
+  targets                  node['newrelic_install']['targets']
 end
 ```
 

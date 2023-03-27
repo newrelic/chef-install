@@ -20,6 +20,9 @@ default['newrelic_install']['verbosity'] = ''
 # TARGETED INSTALL #
 ####################
 
+# infrastructure-agent-installer
+# logs-integration
+# php-agent-installer
 default['newrelic_install']['targets'] = Set[]
 
 ########

@@ -6,7 +6,7 @@ unified_mode true
 property :new_relic_api_key,      String
 property :new_relic_account_id,   String
 property :new_relic_region,       String
-property :targets,                Set, default: Set[]
+property :targets,                Array, default: []
 property :env,                    Hash
 property :verbosity,              String
 property :timeout_seconds,        Integer, default: 600
@@ -67,20 +67,20 @@ action_class do
   def check_targets
     allowedTargets = Set['infrastructure-agent-installer', 'logs-integration', 'php-agent-installer']
     allowedTargetsString = 'infrastructure-agent-installer, logs-integration, php-agent-installer'
+    incomingTargets = new_resource.targets.to_set
 
-    if new_resource.targets.nil? || new_resource.targets.empty?
+    if incomingTargets.nil? || incomingTargets.empty?
       raise ArgumentError, 'Targets must contain at least one installation target'
     end
 
-    raise ArgumentError, "Targets must only contains valid value(#{allowedTargetsString})" unless new_resource.targets.subset?(allowedTargets)
+    raise ArgumentError, "Targets must only contains valid value(#{allowedTargetsString})" unless incomingTargets.subset?(allowedTargets)
 
-    if new_resource.targets.include?('logs-integration')
-      raise ArgumentError, 'Targets must include infrastructure-agent-installer if log is included' unless new_resource.targets.include?('infrastructure-agent-installer')
+    if incomingTargets.include?('logs-integration')
+      raise ArgumentError, 'Targets must include infrastructure-agent-installer if log is included' unless incomingTargets.include?('infrastructure-agent-installer')
     end
   end
 
   def stringify_targets(targets)
-    targets = %w(infrastructure-agent-installer logs-integration) if targets.nil? || targets.empty?
     _ = " -n #{targets.join(',')}" unless targets.nil? || targets.empty?
   end
 

@@ -6,7 +6,7 @@ unified_mode true
 property :new_relic_api_key,      String
 property :new_relic_account_id,   String
 property :new_relic_region,       String
-property :targets,                Set, default: Set[] 
+property :targets,                Set, default: Set[]
 property :env,                    Hash
 property :verbosity,              String
 property :timeout_seconds,        Integer, default: 600
@@ -41,7 +41,7 @@ action_class do
   def check_license
     if new_resource.new_relic_api_key.nil? || new_resource.new_relic_api_key.empty?
       if ENV['NEW_RELIC_API_KEY'].nil? || ENV['NEW_RELIC_API_KEY'].empty?
-        raise ArgumentError.new'Please specify your newrelic api key'
+        raise ArgumentError, 'Please specify your newrelic api key'
       end
     else
       ENV['NEW_RELIC_API_KEY'] = new_resource.new_relic_api_key
@@ -49,7 +49,7 @@ action_class do
 
     if new_resource.new_relic_account_id.nil? || new_resource.new_relic_account_id.empty?
       if ENV['NEW_RELIC_ACCOUNT_ID'].nil? || ENV['NEW_RELIC_ACCOUNT_ID'].empty?
-        raise ArgumentError.new'Please specify your newrelic account key'
+        raise ArgumentError, 'Please specify your newrelic account key'
       end
     else
       ENV['NEW_RELIC_ACCOUNT_ID'] = new_resource.new_relic_account_id
@@ -57,29 +57,26 @@ action_class do
 
     if new_resource.new_relic_region.nil? || new_resource.new_relic_region.empty?
       if ENV['NEW_RELIC_REGION'].nil? || ENV['NEW_RELIC_REGION'].empty?
-        raise ArgumentError.new 'Please specify your newrelic region'
+        raise ArgumentError, 'Please specify your newrelic region'
       end
     else
       ENV['NEW_RELIC_REGION'] = new_resource.new_relic_region
     end
   end
-  
+
   def check_targets
     allowedTargets = Set['infrastructure-agent-installer', 'logs-integration', 'php-agent-installer']
     allowedTargetsString = 'infrastructure-agent-installer, logs-integration, php-agent-installer'
 
     if new_resource.targets.nil? || new_resource.targets.empty?
-      raise ArgumentError.new 'Targets must contain at least one installation target'
+      raise ArgumentError, 'Targets must contain at least one installation target'
     end
 
-    if !new_resource.targets.subset?(allowedTargets)
-      raise ArgumentError.new "Targets must only contains valid value(#{allowedTargetsString})"
-    end
+    raise ArgumentError, "Targets must only contains valid value(#{allowedTargetsString})" unless new_resource.targets.subset?(allowedTargets)
 
-    if new_resource.targets.length() == 1 && new_resource.targets.to_a[0] == 'logs-integration'
-      raise ArgumentError.new 'Targets must include infrastructure-agent-installer if log is included'
+    if new_resource.targets.include?('logs-integration')
+      raise ArgumentError, 'Targets must include infrastructure-agent-installer if log is included' unless new_resource.targets.include?('infrastructure-agent-installer')
     end
-
   end
 
   def stringify_targets(targets)

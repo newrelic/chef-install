@@ -5,7 +5,6 @@ describe 'newrelic-install::default' do
   platform 'ubuntu'
 
   context 'when api key is undefined' do
-
     recipe do
       newrelic_install 'test' do
       end
@@ -19,7 +18,7 @@ describe 'newrelic-install::default' do
   context 'when account key is undefined' do
     recipe do
       newrelic_install 'test' do
-      new_relic_api_key 'key' 
+        new_relic_api_key 'key'
       end
     end
 
@@ -31,8 +30,8 @@ describe 'newrelic-install::default' do
   context 'when region is undefined' do
     recipe do
       newrelic_install 'test' do
-      new_relic_api_key 'key' 
-      new_relic_account_id 'id'
+        new_relic_api_key 'key'
+        new_relic_account_id 'id'
       end
     end
 
@@ -44,9 +43,9 @@ describe 'newrelic-install::default' do
   context 'when targets is undefined' do
     recipe do
       newrelic_install 'test' do
-      new_relic_api_key 'key' 
-      new_relic_account_id 'id'
-      new_relic_region 'region'
+        new_relic_api_key 'key'
+        new_relic_account_id 'id'
+        new_relic_region 'region'
       end
     end
 
@@ -58,10 +57,10 @@ describe 'newrelic-install::default' do
   context 'when targets contain invalid value' do
     recipe do
       newrelic_install 'test' do
-      new_relic_api_key 'key' 
-      new_relic_account_id 'id'
-      new_relic_region 'region'
-      targets Set['target']
+        new_relic_api_key 'key'
+        new_relic_account_id 'id'
+        new_relic_region 'region'
+        targets Set['target']
       end
     end
 
@@ -73,10 +72,10 @@ describe 'newrelic-install::default' do
   context 'when targets only contains log' do
     recipe do
       newrelic_install 'test' do
-      new_relic_api_key 'key' 
-      new_relic_account_id 'id'
-      new_relic_region 'region'
-      targets Set['logs-integration']
+        new_relic_api_key 'key'
+        new_relic_account_id 'id'
+        new_relic_region 'region'
+        targets Set['logs-integration']
       end
     end
 
@@ -92,11 +91,11 @@ describe 'newrelic-install::default' do
     default_attributes['newrelic_install']['targets'] = Set['infrastructure-agent-installer']
 
     it 'should execute with target infra and skip core' do
-      expect(subject).to run_execute('newrelic install').with(env: have_key("NEW_RELIC_CLI_SKIP_CORE"))
+      expect(subject).to run_execute('newrelic install').with(env: have_key('NEW_RELIC_CLI_SKIP_CORE'))
     end
 
     it 'run bash newrlic install command with infra' do
-      expect(subject).to run_execute('newrelic install').with(command: include("infrastructure-agent-installer"))
+      expect(subject).to run_execute('newrelic install').with(command: include('infrastructure-agent-installer'))
     end
   end
 
@@ -107,15 +106,15 @@ describe 'newrelic-install::default' do
     default_attributes['newrelic_install']['targets'] = Set['infrastructure-agent-installer', 'logs-integration', 'php-agent-installer']
 
     it 'run bash newrlic install command with infra' do
-      expect(subject).to run_execute('newrelic install').with(command: include("infrastructure-agent-installer"))
+      expect(subject).to run_execute('newrelic install').with(command: include('infrastructure-agent-installer'))
     end
 
     it 'run bash newrlic install command with logs' do
-      expect(subject).to run_execute('newrelic install').with(command: include("logs-integration"))
+      expect(subject).to run_execute('newrelic install').with(command: include('logs-integration'))
     end
 
     it 'run bash newrlic install command with php' do
-      expect(subject).to run_execute('newrelic install').with(command: include("php-agent-installer"))
+      expect(subject).to run_execute('newrelic install').with(command: include('php-agent-installer'))
     end
   end
 
@@ -126,15 +125,15 @@ describe 'newrelic-install::default' do
     default_attributes['newrelic_install']['targets'] = Set['php-agent-installer']
 
     it 'should execute with target infra and skip core' do
-      expect(subject).to run_execute('newrelic install').with(env: have_key("NEW_RELIC_CLI_SKIP_CORE"))
+      expect(subject).to run_execute('newrelic install').with(env: have_key('NEW_RELIC_CLI_SKIP_CORE'))
     end
 
     it 'run bash newrlic install command without infra' do
-      expect(subject).not_to run_execute('newrelic install').with(command: include("infrastructure-agent-installer"))
+      expect(subject).not_to run_execute('newrelic install').with(command: include('infrastructure-agent-installer'))
     end
 
     it 'run bash newrlic install command with php' do
-      expect(subject).to run_execute('newrelic install').with(command: include("-n php-agent-installer"))
+      expect(subject).to run_execute('newrelic install').with(command: include('-n php-agent-installer'))
     end
   end
 
@@ -146,42 +145,11 @@ describe 'newrelic-install::default' do
     default_attributes['newrelic_install']['targets'] = Set['infrastructure-agent-installer']
 
     it 'should execute with target infra and skip core' do
-      expect(subject).to run_powershell_script('newrelic install').with(env: have_key("NEW_RELIC_CLI_SKIP_CORE"))
+      expect(subject).to run_powershell_script('newrelic install').with(env: have_key('NEW_RELIC_CLI_SKIP_CORE'))
     end
 
     it 'run powershell newrlic install command' do
-      expect(subject).to run_powershell_script('newrelic install').with(code: include("infrastructure-agent-installer"))
+      expect(subject).to run_powershell_script('newrelic install').with(code: include('infrastructure-agent-installer'))
     end
   end
-
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

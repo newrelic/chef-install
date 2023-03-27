@@ -6,4 +6,5 @@ newrelic_install 'install' do
   new_relic_account_id     node['newrelic_install']['NEW_RELIC_ACCOUNT_ID']
   new_relic_region         node['newrelic_install']['NEW_RELIC_REGION']
   env                      node['newrelic_install']['env']
+  targets                  node['newrelic_install']['targets']
 end

@@ -63,6 +63,7 @@ end
 |:-----|:--------------|:------------|
 | `default['newrelic_install']['NEW_RELIC_API_KEY']` | `nil` | new relic api key |
 | `default['newrelic_install']['NEW_RELIC_ACCOUNT_ID']` | `nil` | new relic account id |
+| `default['newrelic_install']['targets']` | Set[] | agents to be installed, possible values are (`infrastructure-agent-installer`, `logs-integration`, `php-agent-installer`) |
 
 #### Optional
 
@@ -71,7 +72,6 @@ end
 | `default['newrelic_install']['NEW_RELIC_REGION']` | `US` | new relic regions for your account (`US` or `EU`) |
 | `default['newrelic_install']['env']['HTTPS_PROXY']` | `nil` | proxy url if you are behind a firewall |
 | `default['newrelic_install']['verbosity']` | `nil` | Verbosity options for the installation (`debug` or `trace`). Writes verbose output to a log file on the host. |
-| `default['newrelic_install']['targets']` | [] | agents to be installed, currently always install infrastructure and logs, more to come |
 | `default['newrelic_install']['tags']` | `{}` | key value pair tags added through custom attributes |
 | `default['newrelic_install']['timeout_seconds']` | `600` | Sets timeout for installation task. |
 

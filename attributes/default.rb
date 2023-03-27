@@ -13,14 +13,14 @@ default['newrelic_install']['NEW_RELIC_ACCOUNT_ID'] = ''
 
 default['newrelic_install']['NEW_RELIC_REGION'] = 'US'
 default['newrelic_install']['env']['HTTPS_PROXY'] = nil
-
+default['newrelic_install']['env']['NEW_RELIC_CLI_SKIP_CORE'] = 1
 default['newrelic_install']['verbosity'] = ''
 
 ####################
 # TARGETED INSTALL #
 ####################
 
-default['newrelic_install']['targets'] = []
+default['newrelic_install']['targets'] = Set[]
 
 ########
 # TAGS #

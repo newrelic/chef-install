@@ -60,7 +60,7 @@ describe 'newrelic-install::default' do
         new_relic_api_key 'key'
         new_relic_account_id 'id'
         new_relic_region 'region'
-        targets Set['target']
+        targets ['target']
       end
     end
 
@@ -75,7 +75,7 @@ describe 'newrelic-install::default' do
         new_relic_api_key 'key'
         new_relic_account_id 'id'
         new_relic_region 'region'
-        targets Set['logs-integration']
+        targets ['logs-integration']
       end
     end
 
@@ -88,7 +88,7 @@ describe 'newrelic-install::default' do
     default_attributes['newrelic_install']['NEW_RELIC_API_KEY'] = 'xxx'
     default_attributes['newrelic_install']['NEW_RELIC_ACCOUNT_ID'] = 'xxx'
     default_attributes['newrelic_install']['NEW_RELIC_REGION'] = 'xxx'
-    default_attributes['newrelic_install']['targets'] = Set['infrastructure-agent-installer']
+    default_attributes['newrelic_install']['targets'] = ['infrastructure-agent-installer']
 
     it 'should execute with target infra and skip core' do
       expect(subject).to run_execute('newrelic install').with(env: have_key('NEW_RELIC_CLI_SKIP_CORE'))
@@ -103,7 +103,7 @@ describe 'newrelic-install::default' do
     default_attributes['newrelic_install']['NEW_RELIC_API_KEY'] = 'xxx'
     default_attributes['newrelic_install']['NEW_RELIC_ACCOUNT_ID'] = 'xxx'
     default_attributes['newrelic_install']['NEW_RELIC_REGION'] = 'xxx'
-    default_attributes['newrelic_install']['targets'] = Set['infrastructure-agent-installer', 'logs-integration', 'php-agent-installer']
+    default_attributes['newrelic_install']['targets'] = %w(infrastructure-agent-installer logs-integration php-agent-installer)
 
     it 'run bash newrlic install command with infra' do
       expect(subject).to run_execute('newrelic install').with(command: include('infrastructure-agent-installer'))
@@ -122,7 +122,7 @@ describe 'newrelic-install::default' do
     default_attributes['newrelic_install']['NEW_RELIC_API_KEY'] = 'xxx'
     default_attributes['newrelic_install']['NEW_RELIC_ACCOUNT_ID'] = 'xxx'
     default_attributes['newrelic_install']['NEW_RELIC_REGION'] = 'xxx'
-    default_attributes['newrelic_install']['targets'] = Set['php-agent-installer']
+    default_attributes['newrelic_install']['targets'] = ['php-agent-installer']
 
     it 'should execute with target infra and skip core' do
       expect(subject).to run_execute('newrelic install').with(env: have_key('NEW_RELIC_CLI_SKIP_CORE'))
@@ -142,7 +142,7 @@ describe 'newrelic-install::default' do
     default_attributes['newrelic_install']['NEW_RELIC_API_KEY'] = 'xxx'
     default_attributes['newrelic_install']['NEW_RELIC_ACCOUNT_ID'] = 'xxx'
     default_attributes['newrelic_install']['NEW_RELIC_REGION'] = 'xxx'
-    default_attributes['newrelic_install']['targets'] = Set['infrastructure-agent-installer']
+    default_attributes['newrelic_install']['targets'] = ['infrastructure-agent-installer']
 
     it 'should execute with target infra and skip core' do
       expect(subject).to run_powershell_script('newrelic install').with(env: have_key('NEW_RELIC_CLI_SKIP_CORE'))

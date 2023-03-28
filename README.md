@@ -64,7 +64,7 @@ end
 |:-----|:--------------|:------------|
 | `default['newrelic_install']['NEW_RELIC_API_KEY']` | `nil` | new relic api key |
 | `default['newrelic_install']['NEW_RELIC_ACCOUNT_ID']` | `nil` | new relic account id |
-| `default['newrelic_install']['targets']` | Set[] | agents to be installed, possible values are (`infrastructure-agent-installer`, `logs-integration`, `php-agent-installer`) |
+| `default['newrelic_install']['targets']` | [] | agents to be installed, possible values are (`infrastructure-agent-installer`, `logs-integration`, `php-agent-installer`) |
 
 #### Optional
 

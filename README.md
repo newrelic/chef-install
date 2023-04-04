@@ -76,6 +76,12 @@ end
 | `default['newrelic_install']['tags']` | `{}` | key value pair tags added through custom attributes |
 | `default['newrelic_install']['timeout_seconds']` | `600` | Sets timeout for installation task. |
 
+#### PHP Agent
+
+| Name | Default value | Description |
+|:-----|:--------------|:------------|
+| `default['newrelic_install']['env']['NEW_RELIC_APPLICATION_NAME']` | `nil` | optional name for your php application |
+
 ### Testing
 
 Refer to [testing](https://github.com/chef-cookbooks/community_cookbook_documentation/blob/master/TESTING.MD)

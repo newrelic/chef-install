@@ -41,4 +41,5 @@ default['newrelic_install']['timeout_seconds'] = '600'
 # PHP AGENT #
 #############
 
+# optional name for your php application
 default['newrelic_install']['env']['NEW_RELIC_APPLICATION_NAME'] = ''

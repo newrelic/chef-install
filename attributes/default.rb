@@ -23,7 +23,7 @@ default['newrelic_install']['verbosity'] = ''
 # infrastructure-agent-installer
 # logs-integration
 # php-agent-installer
-default['newrelic_install']['targets'] = Set[]
+default['newrelic_install']['targets'] = []
 
 ########
 # TAGS #
@@ -36,3 +36,10 @@ default['newrelic_install']['tags'] = {}
 ################
 
 default['newrelic_install']['timeout_seconds'] = '600'
+
+#############
+# PHP AGENT #
+#############
+
+# optional name for your php application
+default['newrelic_install']['env']['NEW_RELIC_APPLICATION_NAME'] = ''

@@ -196,7 +196,7 @@ describe 'newrelic-install::default' do
     default_attributes['newrelic_install']['NEW_RELIC_API_KEY'] = 'xxx'
     default_attributes['newrelic_install']['NEW_RELIC_ACCOUNT_ID'] = 'xxx'
     default_attributes['newrelic_install']['NEW_RELIC_REGION'] = 'xxx'
-    default_attributes['newrelic_install']['targets'] = ['infrastructure-agent-installer']
+    default_attributes['newrelic_install']['targets'] = %w(infrastructure-agent-installer logs-integration dotnet-agent-installer)
 
     it 'should execute with target infra and skip core' do
       expect(subject).to run_powershell_script('newrelic install').with(env: have_key('NEW_RELIC_CLI_SKIP_CORE'))
@@ -231,7 +231,7 @@ describe 'newrelic-install::default' do
 	end
 
     it 'run powershell newrlic install command' do
-      expect(subject).to run_powershell_script('newrelic install').with(code: include('dotnet-agent-installer'))
+      expect(subject).to run_powershell_script('newrelic install').with(code: include('-n dotnet-agent-installer'))
     end
   end
 end

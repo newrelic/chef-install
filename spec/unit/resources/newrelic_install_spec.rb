@@ -224,7 +224,7 @@ describe 'newrelic-install::default' do
     end
 
 	it 'run powershell newrlic install command without infra' do
-	  expect(subject).to run_powershell_script('newrelic install').with(code: include('infrastructure-agent-installer'))
+	  expect(subject).not_to run_powershell_script('newrelic install').with(code: include('infrastructure-agent-installer'))
 	end
 
     it 'run powershell newrlic install command with dotnet' do

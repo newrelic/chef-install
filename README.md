@@ -60,27 +60,33 @@ end
 
 #### Required
 
-| Name | Default value | Description |
-|:-----|:--------------|:------------|
-| `default['newrelic_install']['NEW_RELIC_API_KEY']` | `nil` | new relic api key |
-| `default['newrelic_install']['NEW_RELIC_ACCOUNT_ID']` | `nil` | new relic account id |
-| `default['newrelic_install']['targets']` | [] | agents to be installed, possible values are (`infrastructure-agent-installer`, `logs-integration`, `php-agent-installer`) |
+| Name                                                  | Default value | Description                                                                                                                                         |
+|:------------------------------------------------------|:--------------|:----------------------------------------------------------------------------------------------------------------------------------------------------|
+| `default['newrelic_install']['NEW_RELIC_API_KEY']`    | `nil`         | new relic api key                                                                                                                                   |
+| `default['newrelic_install']['NEW_RELIC_ACCOUNT_ID']` | `nil`         | new relic account id                                                                                                                                |
+| `default['newrelic_install']['targets']`              | []            | agents to be installed, possible values are (`infrastructure-agent-installer`, `logs-integration`, `php-agent-installer`, `dotnet-agent-installer`) |
 
 #### Optional
 
-| Name | Default value | Description |
-|:-----|:--------------|:------------|
-| `default['newrelic_install']['NEW_RELIC_REGION']` | `US` | new relic regions for your account (`US` or `EU`) |
-| `default['newrelic_install']['env']['HTTPS_PROXY']` | `nil` | proxy url if you are behind a firewall |
-| `default['newrelic_install']['verbosity']` | `nil` | Verbosity options for the installation (`debug` or `trace`). Writes verbose output to a log file on the host. |
-| `default['newrelic_install']['tags']` | `{}` | key value pair tags added through custom attributes |
-| `default['newrelic_install']['timeout_seconds']` | `600` | Sets timeout for installation task. |
+| Name                                                | Default value | Description                                                                                                   |
+|:----------------------------------------------------|:--------------|:--------------------------------------------------------------------------------------------------------------|
+| `default['newrelic_install']['NEW_RELIC_REGION']`   | `US`          | new relic regions for your account (`US` or `EU`)                                                             |
+| `default['newrelic_install']['env']['HTTPS_PROXY']` | `nil`         | proxy url if you are behind a firewall                                                                        |
+| `default['newrelic_install']['verbosity']`          | `nil`         | Verbosity options for the installation (`debug` or `trace`). Writes verbose output to a log file on the host. |
+| `default['newrelic_install']['tags']`               | `{}`          | key value pair tags added through custom attributes                                                           |
+| `default['newrelic_install']['timeout_seconds']`    | `600`         | Sets timeout for installation task.                                                                           |
 
 #### PHP Agent
 
-| Name | Default value | Description |
-|:-----|:--------------|:------------|
-| `default['newrelic_install']['env']['NEW_RELIC_APPLICATION_NAME']` | `nil` | optional name for your php application |
+| Name                                                               | Default value | Description                            |
+|:-------------------------------------------------------------------|:--------------|:---------------------------------------|
+| `default['newrelic_install']['env']['NEW_RELIC_APPLICATION_NAME']` | `nil`         | optional name for your php application |
+
+#### Dotnet Agent
+
+| Name                                                               | Default value | Description                               |
+|:-------------------------------------------------------------------|:--------------|:------------------------------------------|
+| `default['newrelic_install']['env']['NEW_RELIC_APPLICATION_NAME']` | `nil`         | optional name for your dotnet application |
 
 ### Testing
 

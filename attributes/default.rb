@@ -23,6 +23,7 @@ default['newrelic_install']['verbosity'] = ''
 # infrastructure-agent-installer
 # logs-integration
 # php-agent-installer
+# dotnet-agent-installer
 default['newrelic_install']['targets'] = []
 
 ########

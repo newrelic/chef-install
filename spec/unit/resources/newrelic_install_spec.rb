@@ -206,11 +206,11 @@ describe 'newrelic-install::default' do
       expect(subject).to run_powershell_script('newrelic install').with(code: include('infrastructure-agent-installer'))
     end
 	
-	it 'run powershell newrlic install command' do
+	it 'run powershell newrlic install command with logs' do
 	  expect(subject).to run_powershell_script('newrelic install').with(code: include('logs-integration'))
 	end
 	  
-	it 'run powershell newrlic install command' do
+	it 'run powershell newrlic install command with dotnet' do
 	  expect(subject).to run_powershell_script('newrelic install').with(code: include('dotnet-agent-installer'))
 	end
   end
@@ -226,11 +226,11 @@ describe 'newrelic-install::default' do
       expect(subject).to run_powershell_script('newrelic install').with(env: have_key('NEW_RELIC_CLI_SKIP_CORE'))
     end
 
-	it 'run powershell newrlic install command' do
+	it 'run powershell newrlic install command without infra' do
 	  expect(subject).to run_powershell_script('newrelic install').with(code: include('infrastructure-agent-installer'))
 	end
 
-    it 'run powershell newrlic install command' do
+    it 'run powershell newrlic install command with dotnet' do
       expect(subject).to run_powershell_script('newrelic install').with(code: include('-n dotnet-agent-installer'))
     end
   end

@@ -65,8 +65,8 @@ action_class do
   end
 
   def check_targets
-    allowedTargets = Set['infrastructure-agent-installer', 'logs-integration', 'php-agent-installer']
-    allowedTargetsString = 'infrastructure-agent-installer, logs-integration, php-agent-installer'
+    allowedTargets = Set['infrastructure-agent-installer', 'logs-integration', 'php-agent-installer', 'dotnet-agent-installer']
+    allowedTargetsString = 'infrastructure-agent-installer, logs-integration, php-agent-installer, dotnet-agent-installer'
     incomingTargets = new_resource.targets.to_set
 
     if incomingTargets.nil? || incomingTargets.empty?

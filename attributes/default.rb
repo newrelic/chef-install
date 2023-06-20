@@ -23,6 +23,7 @@ default['newrelic_install']['verbosity'] = ''
 # infrastructure-agent-installer
 # logs-integration
 # php-agent-installer
+# dotnet-agent-installer
 default['newrelic_install']['targets'] = []
 
 ########
@@ -38,8 +39,8 @@ default['newrelic_install']['tags'] = {}
 default['newrelic_install']['timeout_seconds'] = '600'
 
 #############
-# PHP AGENT #
+# PHP, DOTNET #
 #############
 
-# optional name for your php application
+# optional name for your application
 default['newrelic_install']['env']['NEW_RELIC_APPLICATION_NAME'] = ''

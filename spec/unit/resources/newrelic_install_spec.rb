@@ -230,4 +230,64 @@ describe 'newrelic-install::default' do
       expect(subject).to run_powershell_script('newrelic install').with(code: include('-n dotnet-agent-installer'))
     end
   end
+
+  context 'when targets only contains super agent' do
+    default_attributes['newrelic_install']['NEW_RELIC_API_KEY'] = 'xxx'
+    default_attributes['newrelic_install']['NEW_RELIC_ACCOUNT_ID'] = 'xxx'
+    default_attributes['newrelic_install']['NEW_RELIC_REGION'] = 'xxx'
+    default_attributes['newrelic_install']['targets'] = ['super-agent']
+
+    it 'should execute with target infra and skip core' do
+      expect(subject).to run_execute('newrelic install').with(env: have_key('NEW_RELIC_CLI_SKIP_CORE'))
+    end
+
+    it 'run bash newrelic install command with super-agent' do
+      expect(subject).to run_execute('newrelic install').with(command: include('super-agent'))
+    end
+
+    it 'run powershell newrelic install command without super-agent' do
+      expect(subject).not_to run_powershell_script('newrelic install').with(code: include('super-agent'))
+    end
+  end
+
+  context 'when targets contains super agent infra agent and logs' do
+    default_attributes['newrelic_install']['NEW_RELIC_API_KEY'] = 'xxx'
+    default_attributes['newrelic_install']['NEW_RELIC_ACCOUNT_ID'] = 'xxx'
+    default_attributes['newrelic_install']['NEW_RELIC_REGION'] = 'xxx'
+    default_attributes['newrelic_install']['targets'] = %w(super-agent infrastructure-agent-installer logs-integration)
+
+    it 'should execute with target infra and skip core' do
+      expect(subject).to run_execute('newrelic install').with(env: have_key('NEW_RELIC_CLI_SKIP_CORE'))
+    end
+
+    it 'run bash newrelic install command with super-agent' do
+      expect(subject).to run_execute('newrelic install').with(command: include('super-agent'))
+    end
+
+    it 'run bash newrelic install command with infra' do
+      expect(subject).to run_execute('newrelic install').with(command: include('infrastructure-agent-installer'))
+    end
+
+    it 'run bash newrelic install command with logs' do
+      expect(subject).to run_execute('newrelic install').with(command: include('logs-integration'))
+    end
+  end
+  context 'when targets only contains super agent logs' do
+    default_attributes['newrelic_install']['NEW_RELIC_API_KEY'] = 'xxx'
+    default_attributes['newrelic_install']['NEW_RELIC_ACCOUNT_ID'] = 'xxx'
+    default_attributes['newrelic_install']['NEW_RELIC_REGION'] = 'xxx'
+    default_attributes['newrelic_install']['targets'] = ['logs-integration-super-agent']
+
+    it 'should execute with target infra and skip core' do
+      expect(subject).to run_execute('newrelic install').with(env: have_key('NEW_RELIC_CLI_SKIP_CORE'))
+    end
+
+    it 'run bash newrelic install command with logs-integration-super-agent' do
+      expect(subject).to run_execute('newrelic install').with(command: include('logs-integration-super-agent'))
+    end
+
+    it 'run powershell newrelic install command without logs-integration-super-agent' do
+      expect(subject).not_to run_powershell_script('newrelic install').with(code: include('logs-integration-super-agent'))
+    end
+  end
 end

@@ -65,18 +65,25 @@ action_class do
   end
 
   def check_targets
-    allowedTargets = Set['infrastructure-agent-installer', 'logs-integration', 'php-agent-installer', 'dotnet-agent-installer']
-    allowedTargetsString = 'infrastructure-agent-installer, logs-integration, php-agent-installer, dotnet-agent-installer'
-    incomingTargets = new_resource.targets.to_set
+    allowed_targets = Set.new(%w(
+    infrastructure-agent-installer
+    logs-integration
+    php-agent-installer
+    dotnet-agent-installer
+    super-agent
+    logs-integration-super-agent
+    ))
+    allowed_targets_string = allowed_targets.join(', ')
+    incoming_targets = new_resource.targets.to_set
 
-    if incomingTargets.nil? || incomingTargets.empty?
+    if incoming_targets.nil? || incoming_targets.empty?
       raise ArgumentError, 'Targets must contain at least one installation target'
     end
 
-    raise ArgumentError, "Targets must only contains valid value(#{allowedTargetsString})" unless incomingTargets.subset?(allowedTargets)
+    raise ArgumentError, "Targets must only contains valid value(#{allowed_targets_string})" unless incoming_targets.subset?(allowed_targets)
 
-    if incomingTargets.include?('logs-integration')
-      raise ArgumentError, 'Targets must include infrastructure-agent-installer if log is included' unless incomingTargets.include?('infrastructure-agent-installer')
+    if incoming_targets.include?('logs-integration')
+      raise ArgumentError, 'Targets must include infrastructure-agent-installer if log is included' unless incoming_targets.include?('infrastructure-agent-installer')
     end
   end
 

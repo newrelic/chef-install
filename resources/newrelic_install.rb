@@ -70,8 +70,8 @@ action_class do
     logs-integration
     php-agent-installer
     dotnet-agent-installer
-    super-agent
-    logs-integration-super-agent
+    agent-control
+    logs-integration-agent-control
     ))
     allowed_targets_string = allowed_targets.join(', ')
     incoming_targets = new_resource.targets.to_set

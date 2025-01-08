@@ -7,7 +7,7 @@ license 'All Rights Reserved'
 description 'Installs/Configures Newrelic agents using guided install through chef'
 source_url        'https://github.com/newrelic/chef-install'
 issues_url        'https://github.com/newrelic/chef-install/issues'
-version '0.1.12'
+version '0.1.13'
 chef_version '>= 15.0'
 
 # Platform support

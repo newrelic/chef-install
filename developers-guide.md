@@ -1,4 +1,4 @@
-## Add a New Target to the Chef Cookbook
+# Add a New Target to the Chef Cookbook
 
 This guide is for developers who want to add support for a new target in the `newrelic_install` cookbook.
 
@@ -36,9 +36,23 @@ This guide is for developers who want to add support for a new target in the `ne
     cd chef-install
     ```
 
-- **Add target agent name in `resources/newrelic_install.rb` and `attributes/default.rb`:**
-    
-  ![image](https://github.com/user-attachments/assets/d4a7e5e1-4b4e-4758-8543-9adb5328e363)
+- **Add target agent name in `resources/newrelic_install.rb`:**
+
+  **Note:** The installer names can be found in the recipes of the [open-install-library](https://github.com/newrelic/open-install-library) repository.
+
+  **Example: Adding Support for Java Agent:**
+  - First, retrieve the agent installer name from the [Node](https://github.com/newrelic/open-install-library/blob/main/recipes/newrelic/apm/node/linux.yml) recipe.
+    All agent recipes can be found in `recipes/newrelic` directory.
+    The `name` attribute at the top of the .yml file (e.g., `linux.yml`) corresponds to the agent installer name needed for the `allowed_targets`.
+
+    ![image](https://github.com/user-attachments/assets/7c64ebc2-00ae-4af7-b620-14059fbf2085)
+
+  - After retrieving the installer name, add it to the `allowed_targets` in `resources/newrelic_install.rb`.
+    From the previous example, updated `allowed_targets` for the Node agent will look like this:
+
+    ![image](https://github.com/user-attachments/assets/d4a7e5e1-4b4e-4758-8543-9adb5328e363)
+
+- **Add target agent name in `attributes/default.rb`:**
 
   ![image](https://github.com/user-attachments/assets/56ce960f-d2ab-4632-91bd-06033633b393)
 

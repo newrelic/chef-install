@@ -2,7 +2,7 @@
 
 This guide is for developers who want to add support for a new target in the `newrelic_install` cookbook.
 
-### 1. Setup Workstation
+### Step 1: Setup Workstation
 
 - **Download and Install Chef Workstation**
 
@@ -28,7 +28,7 @@ This guide is for developers who want to add support for a new target in the `ne
   chef -v
   ```
 
-### 2. Add target to `chef-install` repository
+### Step 2: Add target to `chef-install` repository
 
 - **Clone `chef-install` repository:**
     ```bash
@@ -36,11 +36,11 @@ This guide is for developers who want to add support for a new target in the `ne
     cd chef-install
     ```
 
-- **Add target agent name in `resources/newrelic_install.rb`:**
+- **Add target agent name in `chef-install`:**
 
   **Note:** The installer names can be found in the recipes of the [open-install-library](https://github.com/newrelic/open-install-library) repository.
 
-  **Example: Adding Support for Java Agent:**
+  **Example: Adding Support for Node Agent:**
   - First, retrieve the agent installer name from the [Node](https://github.com/newrelic/open-install-library/blob/main/recipes/newrelic/apm/node/linux.yml) recipe.
     All agent recipes can be found in `recipes/newrelic` directory.
     The `name` attribute at the top of the .yml file (e.g., `linux.yml`) corresponds to the agent installer name needed for the `allowed_targets`.
@@ -52,13 +52,18 @@ This guide is for developers who want to add support for a new target in the `ne
 
     ![image](https://github.com/user-attachments/assets/d4a7e5e1-4b4e-4758-8543-9adb5328e363)
 
-- **Add target agent name in `attributes/default.rb`:**
+  - **Add target agent name in `attributes/default.rb`:**
 
-  ![image](https://github.com/user-attachments/assets/56ce960f-d2ab-4632-91bd-06033633b393)
+    ![image](https://github.com/user-attachments/assets/8cfe577e-8ae7-4939-bc56-4386e6b9dcb2)
 
-### 3. Test Changes Locally
+### Step 3: Testing the target locally
 
-- Before testing the changes, make sure the required environment variables such as API keys and targeted installs are configured properly in `attributes/default.rb`
+- **Configure `attributes/default.rb`**
+
+    Add the target agent name to the targets attribute (include any environment variables required by the agent). For more information on enviroment variables, please refer to [newrelic docs](https://docs.newrelic.com/).
+  
+  ![image](https://github.com/user-attachments/assets/2c94eaac-16ea-444a-b2ba-61e7d685a8f3)
+
 - To test your changes locally, execute the following command:
   
     ```bash
@@ -66,3 +71,9 @@ This guide is for developers who want to add support for a new target in the `ne
     chef-client -z -r "recipe[chef-install::default]"
     ```
 
+**Note: If you are a developer who want to add support for a new target agent in the `newrelic_install` cookbook, the instructions in this guide for adding a new target agent support will only modify the local copy of the `newrelic_install` cookbook.**
+
+**To make these changes live, you will need to:**
+- **Create a pull request ([reference PR](https://github.com/newrelic/chef-install/pull/17)) with your modifications.**
+- **Once the PR is merged, the changes will be released.**
+- **After the changes are merged and released, the `newrelic_install` cookbook will be updated on Chef Supermarket.**

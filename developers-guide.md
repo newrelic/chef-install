@@ -60,7 +60,7 @@ This guide is for developers who want to add support for a new target in the `ne
 
 - **Configure `attributes/default.rb`**
 
-    Add the target agent name to the targets attribute (include any environment variables required by the agent). For more information on enviroment variables, please refer to [newrelic docs](https://docs.newrelic.com/).
+    Add the target agent name to the targets attribute and include any environment variables required by the agent (Note: To locate the environment variables for a specific agent, please refer to the configuration section of the specific [agent](https://docs.newrelic.com/docs/apm/new-relic-apm/getting-started/introduction-apm/) documentation).
   
   ![image](https://github.com/user-attachments/assets/2c94eaac-16ea-444a-b2ba-61e7d685a8f3)
 

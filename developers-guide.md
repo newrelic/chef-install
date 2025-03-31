@@ -71,6 +71,11 @@ This guide is for developers who want to add support for a new target in the `ne
     chef-client -z -r "recipe[chef-install::default]"
     ```
 
+    **Note: Upon executing the above command, the cookbook will utilize the New Relic CLI to perform target installations included in `attributes/default.rb`. All targets in this cookbook depend on the New Relic CLI for installation.**
+
+    ![image](https://github.com/user-attachments/assets/36204f9c-f541-4482-8ebc-3d553b90f320)
+
+
 **Note: If you are a developer who want to add support for a new target agent in the `newrelic_install` cookbook, the instructions in this guide for adding a new target agent support will only modify the local copy of the `newrelic_install` cookbook.**
 
 **To make these changes live, you will need to:**

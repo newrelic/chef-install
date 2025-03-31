@@ -78,7 +78,7 @@ This guide is for developers who want to add support for a new target in the `ne
 
 **Note: If you are a developer who want to add support for a new target agent in the `newrelic_install` cookbook, the instructions in this guide for adding a new target agent support will only modify the local copy of the `newrelic_install` cookbook.**
 
-**To make these changes live, you will need to:**
-- **Create a pull request ([reference PR](https://github.com/newrelic/chef-install/pull/17)) with your modifications.**
-- **Once the PR is merged, the changes will be released.**
-- **After the changes are merged and released, the `newrelic_install` cookbook will be updated on Chef Supermarket.**
+To make these changes live, you will need to:
+- Create a pull request ([reference PR](https://github.com/newrelic/chef-install/pull/17)) with your modifications.
+- Once the PR is merged, the changes will be released.
+- After the changes are merged and released, the `newrelic_install` cookbook will be updated on Chef Supermarket.

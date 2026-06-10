@@ -65,14 +65,14 @@ action_class do
   end
 
   def check_targets
-    allowed_targets = Set.new(%w(
-    infrastructure-agent-installer
-    logs-integration
-    php-agent-installer
-    dotnet-agent-installer
-    agent-control
-    logs-integration-agent-control
-    ))
+    allowed_targets = %w(
+      infrastructure-agent-installer
+      logs-integration
+      php-agent-installer
+      dotnet-agent-installer
+      agent-control
+      logs-integration-agent-control
+    ).to_set
     allowed_targets_string = allowed_targets.join(', ')
     incoming_targets = new_resource.targets.to_set
 
@@ -98,10 +98,7 @@ action_class do
 
   def get_tags(tags)
     deploy_tag = 'nr_deployed_by:chef-install'
-    tags_array = []
-    tags.each do |key, value|
-      tags_array.append("#{key}:#{value}")
-    end
+    tags_array = tags.map { |key, value| "#{key}:#{value}" }
     tags_array.append(deploy_tag)
     _ = " --tag #{tags_array.join(',')}"
   end

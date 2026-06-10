@@ -70,7 +70,7 @@ end
 
 | Name                                                | Default value | Description                                                                                                   |
 |:----------------------------------------------------|:--------------|:--------------------------------------------------------------------------------------------------------------|
-| `default['newrelic_install']['NEW_RELIC_REGION']`   | `US`          | new relic regions for your account (`US` or `EU`)                                                             |
+| `default['newrelic_install']['NEW_RELIC_REGION']`   | `US`          | new relic regions for your account (`US`, `EU`, or `JP`)                                                      |
 | `default['newrelic_install']['env']['HTTPS_PROXY']` | `nil`         | proxy url if you are behind a firewall                                                                        |
 | `default['newrelic_install']['verbosity']`          | `nil`         | Verbosity options for the installation (`debug` or `trace`). Writes verbose output to a log file on the host. |
 | `default['newrelic_install']['tags']`               | `{}`          | key value pair tags added through custom attributes                                                           |

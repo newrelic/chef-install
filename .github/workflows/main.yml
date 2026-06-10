@@ -6,9 +6,16 @@ name: ci
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   rspec:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     steps:
       - name: Check out code
         uses: actions/checkout@v3

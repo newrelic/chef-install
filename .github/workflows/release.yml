@@ -1,4 +1,8 @@
 ---
+# yamllint disable rule:line-length
+# Shell scripts embedded in workflow run: blocks routinely exceed 80 chars.
+# Line-length is suppressed for this file only; all other rules still apply.
+
 # Release workflow for the newrelic-install Chef cookbook.
 #
 # Trigger : manually via Actions → Release → Run workflow.
@@ -137,21 +141,22 @@ jobs:
         shell: bash
 
       # Removes the PEM from disk unconditionally — runs even if the publish step failed.
+      # rm -f will not error if the file does not exist.
       - name: "🧹 Cleanup: Remove PEM Credential from Disk"
         if: always()
         run: rm -f newrelic.pem
         shell: bash
 
       # Polls the public Supermarket REST API until the new version is confirmed live.
-      # The API path uses underscores in the version (0_1_15), not dots.
+      # Both dot (0.1.15) and underscore (0_1_15) formats are accepted by the API;
+      # dots are used here to keep the version string consistent throughout the workflow.
       # Exits with ::warning:: on timeout rather than failing — publish already returned
       # success; a polling timeout is not a release failure.
       - name: "🔎 Verify: Confirm Version is Live on Chef Supermarket"
         run: |
           set -euo pipefail
           VERSION="${{ github.event.inputs.version }}"
-          VERSION_URL=$(echo "$VERSION" | tr '.' '_')
-          URL="https://supermarket.chef.io/api/v1/cookbooks/newrelic-install/versions/${VERSION_URL}"
+          URL="https://supermarket.chef.io/api/v1/cookbooks/newrelic-install/versions/${VERSION}"
           MAX_ATTEMPTS=12
           ATTEMPT=0
 
@@ -160,7 +165,7 @@ jobs:
             ATTEMPT=$((ATTEMPT + 1))
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
             if [ "$STATUS" = "200" ]; then
-              echo "✅ Version '$VERSION' is live: https://supermarket.chef.io/cookbooks/newrelic-install/versions/${VERSION_URL}"
+              echo "✅ Version '$VERSION' is live: https://supermarket.chef.io/cookbooks/newrelic-install/versions/${VERSION}"
               exit 0
             fi
             echo "Attempt $ATTEMPT/$MAX_ATTEMPTS — HTTP $STATUS, not yet visible. Retrying in 10s..."

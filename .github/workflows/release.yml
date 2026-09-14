@@ -6,22 +6,24 @@
 # Release workflow for the newrelic-install Chef cookbook.
 #
 # Trigger : manually via Actions → Release → Run workflow.
-# Pipeline: validate input → bump metadata.rb on main → publish to Chef
-#           Supermarket via knife → poll Supermarket API to confirm propagation.
+# Pipeline: validate input → bump metadata.rb on a release branch → open PR →
+#           wait for required checks (FOSSA) → squash-merge to main →
+#           publish to Chef Supermarket via knife →
+#           poll Supermarket API to confirm propagation.
 #
-# Re-run safety: if a previous run committed the version bump but knife failed,
-# re-running with the same version skips the bump/commit and goes straight to
-# publish — no manual cleanup required.
+# Re-run safety: if a prior run merged the bump PR but knife subsequently
+# failed, re-running with the same version detects SKIP_BUMP (version already
+# on main), skips the branch/PR/merge steps, and goes straight to publish.
 #
-# Branch-protection note: if main requires PR reviews, set a repo-scoped PAT as
-# the RELEASE_TOKEN secret and add its owner as a branch-rule bypass actor.
-# Without it the bot push will be rejected with HTTP 403. Repos without branch
-# protection work with the default GITHUB_TOKEN.
+# Branch protection: main blocks direct pushes and requires FOSSA to pass.
+# This workflow respects both rules via a short-lived release/VERSION PR.
 name: Release
 
-# Minimum scope — only the bot commit to main requires write access.
+# contents: write   — push the release branch
+# pull-requests: write — open and merge the version-bump PR
 permissions:
   contents: write
+  pull-requests: write
 
 on:
   workflow_dispatch:
@@ -35,31 +37,28 @@ jobs:
   release:
     runs-on: ubuntu-latest
     name: "🚀 Release: Publish newrelic-install to Chef Supermarket"
-    # Generous ceiling: Chef Workstation install + knife + 2-min Supermarket poll.
-    timeout-minutes: 15
+    # Chef Workstation install (~1 min) + PR checks (~1 min) + knife + 2-min poll.
+    timeout-minutes: 20
     steps:
-      # Checks out main so every step operates on the latest committed state.
-      # Prefers RELEASE_TOKEN (PAT) over GITHUB_TOKEN for branch-protected repos.
+      # Checks out main so all subsequent steps operate on the latest committed state.
       - name: "📦 Checkout: Fetch main at HEAD"
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
-      # Validates format (must be 0.1.x) and direction (must increment the patch).
-      # On failure, GitHub renders ::error:: lines as red annotations in the UI.
-      # Equal-to-current sets SKIP_BUMP=true instead of failing — this is the safe
-      # re-run path when a prior run committed the bump but knife subsequently failed.
+      # Guards against malformed input and non-monotonic releases before any mutation.
+      # ::error:: annotations render as red failure banners in the GitHub Actions UI.
+      # Equal-to-current means a prior run bumped and merged but knife failed —
+      # sets SKIP_BUMP=true so we go straight to publish without re-opening a PR.
       - name: "🔍 Validate: Verify Version Format and Monotonic Increment"
         run: |
           set -euo pipefail
           VERSION="${{ github.event.inputs.version }}"
 
-          # Read the version currently committed on main.
           CURRENT=$(grep -E "^version '" metadata.rb | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
           CURRENT_PATCH=$(echo "$CURRENT" | cut -d. -f3)
           SUGGESTED="0.1.$((CURRENT_PATCH + 1))"
 
-          # Reject anything outside the strict 0.1.x convention.
           if ! echo "$VERSION" | grep -qE '^0\.1\.[0-9]+$'; then
             echo "::error::❌ Invalid version '$VERSION'."
             echo "::error::   Must follow the 0.1.x convention (x = non-negative integer)."
@@ -71,9 +70,7 @@ jobs:
           INPUT_PATCH=$(echo "$VERSION" | cut -d. -f3)
 
           if [ "$INPUT_PATCH" -eq "$CURRENT_PATCH" ]; then
-            # Version already on main — a prior run bumped it but publish failed.
-            # Skip bump and commit; proceed directly to publish.
-            echo "::warning::⚠️ '$VERSION' already set in metadata.rb — skipping bump, proceeding to publish."
+            echo "::warning::⚠️ '$VERSION' already in metadata.rb on main — skipping bump, proceeding to publish."
             echo "SKIP_BUMP=true" >> "$GITHUB_ENV"
           elif [ "$INPUT_PATCH" -lt "$CURRENT_PATCH" ]; then
             echo "::error::❌ '$VERSION' is behind the current version '$CURRENT'."
@@ -84,15 +81,15 @@ jobs:
             echo "✅ Version '$VERSION' is valid — releasing $CURRENT → $VERSION."
           fi
 
-      # Rewrites the version line in metadata.rb and reads it back to confirm the write.
-      # Skipped entirely when SKIP_BUMP=true (version already on main).
+      # Rewrites the version line in metadata.rb and reads it back to confirm.
+      # Read-back assertion catches silent no-ops if the line format ever drifts.
+      # Skipped when SKIP_BUMP=true.
       - name: "✏️ Bump: Update Version in metadata.rb"
         if: env.SKIP_BUMP != 'true'
         run: |
           set -euo pipefail
           sed -i "s/^version '.*'/version '${{ github.event.inputs.version }}'/" metadata.rb
 
-          # Read-back assertion — catches silent no-ops if the line format ever drifts.
           WRITTEN=$(grep -E "^version '" metadata.rb | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
           if [ "$WRITTEN" != "${{ github.event.inputs.version }}" ]; then
             echo "::error::❌ Write verification failed — metadata.rb shows '$WRITTEN', expected '${{ github.event.inputs.version }}'."
@@ -100,58 +97,126 @@ jobs:
           fi
           echo "✅ metadata.rb confirmed at version '$WRITTEN'."
 
-      # Commits the metadata.rb change as github-actions[bot] and pushes directly to main.
-      # Release date is stamped in IST to match the team's timezone.
-      # [skip ci] prevents the push from re-triggering the CI workflow.
-      # On push rejection (concurrent race), rebases once on latest main before retrying.
-      # Skipped entirely when SKIP_BUMP=true.
-      - name: "📝 Commit: Push Version Bump to main"
+      # Commits the bump to release/VERSION, pushes, and opens a PR targeting main.
+      # main blocks direct pushes (GH013 ruleset) so a PR is required.
+      # No [skip ci] on this commit — FOSSA must run on the PR for the merge to be allowed.
+      # PR number is written to GITHUB_ENV for the merge step.
+      # Skipped when SKIP_BUMP=true.
+      - name: "🌿 Branch: Push Version Bump and Open Release PR"
         if: env.SKIP_BUMP != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
         run: |
           set -euo pipefail
           RELEASE_DATE=$(TZ="Asia/Kolkata" date +'%-d %B %Y')
+          BRANCH="release/${{ github.event.inputs.version }}"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
           git add metadata.rb
-          git commit -m "chore(version): bump to ${{ github.event.inputs.version }}, ${RELEASE_DATE} [skip ci]"
+          git commit -m "chore(version): bump to ${{ github.event.inputs.version }}, ${RELEASE_DATE}"
+          git push origin "$BRANCH"
+          echo "✅ Pushed version bump to $BRANCH."
 
-          # Retry once with rebase if another commit landed on main between checkout and push.
-          if ! git push origin main; then
-            echo "Push rejected — rebasing on latest main and retrying..."
-            git pull --rebase origin main
-            git push origin main
-          fi
-          echo "✅ Version bump committed and pushed."
+          PR_URL=$(gh pr create \
+            --repo newrelic/chef-install \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore(version): bump to ${{ github.event.inputs.version }}, ${RELEASE_DATE}" \
+            --body "Automated version bump to \`${{ github.event.inputs.version }}\` — triggered by the Release workflow.")
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+          echo "✅ PR #$PR_NUMBER created: $PR_URL"
 
-      # Installs Chef Workstation, which provides the knife CLI used to publish to Supermarket.
+      # Polls mergeStateStatus until all required checks pass, then squash-merges.
+      # CLEAN/UNSTABLE = mergeable; BLOCKED = checks still running; DIRTY = conflict (fatal).
+      # Squash keeps main history linear; [skip ci] on the merge commit title
+      # prevents CI re-running on a metadata-only change.
+      # Release branch is deleted after merge.
+      # Skipped when SKIP_BUMP=true.
+      - name: "🔀 Merge: Wait for Checks and Merge Release PR"
+        if: env.SKIP_BUMP != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${{ env.PR_NUMBER }}"
+          MAX_WAIT=300
+          ELAPSED=0
+
+          echo "Waiting for required checks on PR #$PR_NUMBER..."
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            RESULT=$(gh pr view "$PR_NUMBER" \
+              --repo newrelic/chef-install \
+              --json mergeStateStatus,state,merged \
+              --jq '[.mergeStateStatus, .state, (.merged | tostring)] | join(" ")')
+            MERGE_STATUS=$(echo "$RESULT" | cut -d' ' -f1)
+            PR_STATE=$(echo "$RESULT" | cut -d' ' -f2)
+            IS_MERGED=$(echo "$RESULT" | cut -d' ' -f3)
+
+            if [ "$IS_MERGED" = "true" ]; then
+              echo "✅ PR #$PR_NUMBER is already merged."
+              exit 0
+            fi
+            if [ "$PR_STATE" = "CLOSED" ]; then
+              echo "::error::❌ PR #$PR_NUMBER was closed without merging."
+              exit 1
+            fi
+
+            case "$MERGE_STATUS" in
+              CLEAN|UNSTABLE)
+                echo "Status: $MERGE_STATUS — merging PR #$PR_NUMBER..."
+                gh pr merge "$PR_NUMBER" \
+                  --repo newrelic/chef-install \
+                  --squash \
+                  --delete-branch \
+                  --subject "chore(version): bump to ${{ github.event.inputs.version }} [skip ci]"
+                echo "✅ PR #$PR_NUMBER squash-merged."
+                exit 0
+                ;;
+              DIRTY|CONFLICTING)
+                echo "::error::❌ PR #$PR_NUMBER has merge conflicts — cannot proceed."
+                exit 1
+                ;;
+              BLOCKED|BEHIND|UNKNOWN|*)
+                echo "Status: $MERGE_STATUS — waiting 20s... (${ELAPSED}/${MAX_WAIT}s elapsed)"
+                ;;
+            esac
+
+            sleep 20
+            ELAPSED=$((ELAPSED + 20))
+          done
+
+          echo "::error::❌ PR #$PR_NUMBER did not become mergeable within ${MAX_WAIT}s."
+          exit 1
+
+      # Installs Chef Workstation, providing the knife CLI used to publish.
       - name: "🔧 Setup: Install Chef Workstation"
         uses: actionshub/chef-install@2.0.4
 
-      # Writes the Supermarket private key from secrets to disk.
-      # knife resolves this via .chef/config.rb (client_key '../newrelic.pem').
+      # Writes the Supermarket RSA private key from secrets to disk.
+      # knife resolves this path via .chef/config.rb (client_key '../newrelic.pem').
       - name: "🔑 Auth: Write Chef Supermarket PEM Credential"
         run: echo "${{ secrets.newrelic_pem }}" > newrelic.pem
         shell: bash
 
-      # Packages the cookbook and uploads it to Chef Supermarket under the newrelic account.
-      # knife resolves cookbook path and credentials from .chef/config.rb.
+      # Packages the local cookbook and uploads it to Chef Supermarket under the newrelic account.
+      # knife reads version from the local metadata.rb updated in the Bump step.
       - name: "📤 Publish: Share newrelic-install to Chef Supermarket"
         run: knife supermarket share newrelic-install
         shell: bash
 
-      # Removes the PEM from disk unconditionally — runs even if the publish step failed.
-      # rm -f will not error if the file does not exist.
+      # Removes the PEM from disk unconditionally — runs even if publish fails.
       - name: "🧹 Cleanup: Remove PEM Credential from Disk"
         if: always()
         run: rm -f newrelic.pem
         shell: bash
 
-      # Polls the public Supermarket REST API until the new version is confirmed live.
-      # Both dot (0.1.15) and underscore (0_1_15) formats are accepted by the API;
-      # dots are used here to keep the version string consistent throughout the workflow.
-      # Exits with ::warning:: on timeout rather than failing — publish already returned
-      # success; a polling timeout is not a release failure.
+      # Polls the public Supermarket REST API until the new version appears.
+      # Both dot (0.1.20) and underscore (0_1_20) formats are accepted by the API.
+      # A polling timeout exits with ::warning:: rather than failure — publish
+      # already returned success; propagation lag is not a release failure.
       - name: "🔎 Verify: Confirm Version is Live on Chef Supermarket"
         run: |
           set -euo pipefail

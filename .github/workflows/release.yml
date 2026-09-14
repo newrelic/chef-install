@@ -36,7 +36,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release — must follow 0.1.x (e.g. 0.1.22)'
+        description: 'Version to release — must follow 0.1.x convention'
         required: true
         type: string
       skip_version_bump:

@@ -1,21 +1,178 @@
 ---
+# yamllint disable rule:line-length
+# Shell scripts embedded in workflow run: blocks routinely exceed 80 chars.
+# Line-length is suppressed for this file only; all other rules still apply.
+
+# Release workflow for the newrelic-install Chef cookbook.
+#
+# Trigger : manually via Actions → Release → Run workflow.
+# Pipeline: validate input → bump metadata.rb on main → publish to Chef
+#           Supermarket via knife → poll Supermarket API to confirm propagation.
+#
+# Re-run safety: if a previous run committed the version bump but knife failed,
+# re-running with the same version skips the bump/commit and goes straight to
+# publish — no manual cleanup required.
+#
+# Branch-protection note: if main requires PR reviews, set a repo-scoped PAT as
+# the RELEASE_TOKEN secret and add its owner as a branch-rule bypass actor.
+# Without it the bot push will be rejected with HTTP 403. Repos without branch
+# protection work with the default GITHUB_TOKEN.
 name: Release
 
-permissions: write-all
-on: workflow_dispatch
+# Minimum scope — only the bot commit to main requires write access.
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release — must follow 0.1.x (e.g. 0.1.15)'
+        required: true
+        type: string
 
 jobs:
-  pre_release:
+  release:
     runs-on: ubuntu-latest
-    name: Release chef cookbook
+    name: "🚀 Release: Publish newrelic-install to Chef Supermarket"
+    # Generous ceiling: Chef Workstation install + knife + 2-min Supermarket poll.
+    timeout-minutes: 15
     steps:
-      - name: checkout code
-        uses: actions/checkout@v3
-      - name: Install Chef Workstation
+      # Checks out main so every step operates on the latest committed state.
+      # Prefers RELEASE_TOKEN (PAT) over GITHUB_TOKEN for branch-protected repos.
+      - name: "📦 Checkout: Fetch main at HEAD"
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      # Validates format (must be 0.1.x) and direction (must increment the patch).
+      # On failure, GitHub renders ::error:: lines as red annotations in the UI.
+      # Equal-to-current sets SKIP_BUMP=true instead of failing — this is the safe
+      # re-run path when a prior run committed the bump but knife subsequently failed.
+      - name: "🔍 Validate: Verify Version Format and Monotonic Increment"
+        run: |
+          set -euo pipefail
+          VERSION="${{ github.event.inputs.version }}"
+
+          # Read the version currently committed on main.
+          CURRENT=$(grep -E "^version '" metadata.rb | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          CURRENT_PATCH=$(echo "$CURRENT" | cut -d. -f3)
+          SUGGESTED="0.1.$((CURRENT_PATCH + 1))"
+
+          # Reject anything outside the strict 0.1.x convention.
+          if ! echo "$VERSION" | grep -qE '^0\.1\.[0-9]+$'; then
+            echo "::error::❌ Invalid version '$VERSION'."
+            echo "::error::   Must follow the 0.1.x convention (x = non-negative integer)."
+            echo "::error::   Current version in metadata.rb: $CURRENT"
+            echo "::error::   Next suggested version:         $SUGGESTED"
+            exit 1
+          fi
+
+          INPUT_PATCH=$(echo "$VERSION" | cut -d. -f3)
+
+          if [ "$INPUT_PATCH" -eq "$CURRENT_PATCH" ]; then
+            # Version already on main — a prior run bumped it but publish failed.
+            # Skip bump and commit; proceed directly to publish.
+            echo "::warning::⚠️ '$VERSION' already set in metadata.rb — skipping bump, proceeding to publish."
+            echo "SKIP_BUMP=true" >> "$GITHUB_ENV"
+          elif [ "$INPUT_PATCH" -lt "$CURRENT_PATCH" ]; then
+            echo "::error::❌ '$VERSION' is behind the current version '$CURRENT'."
+            echo "::error::   Patch number must exceed $CURRENT_PATCH."
+            echo "::error::   Next suggested version: $SUGGESTED"
+            exit 1
+          else
+            echo "✅ Version '$VERSION' is valid — releasing $CURRENT → $VERSION."
+          fi
+
+      # Rewrites the version line in metadata.rb and reads it back to confirm the write.
+      # Skipped entirely when SKIP_BUMP=true (version already on main).
+      - name: "✏️ Bump: Update Version in metadata.rb"
+        if: env.SKIP_BUMP != 'true'
+        run: |
+          set -euo pipefail
+          sed -i "s/^version '.*'/version '${{ github.event.inputs.version }}'/" metadata.rb
+
+          # Read-back assertion — catches silent no-ops if the line format ever drifts.
+          WRITTEN=$(grep -E "^version '" metadata.rb | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          if [ "$WRITTEN" != "${{ github.event.inputs.version }}" ]; then
+            echo "::error::❌ Write verification failed — metadata.rb shows '$WRITTEN', expected '${{ github.event.inputs.version }}'."
+            exit 1
+          fi
+          echo "✅ metadata.rb confirmed at version '$WRITTEN'."
+
+      # Commits the metadata.rb change as github-actions[bot] and pushes directly to main.
+      # Release date is stamped in IST to match the team's timezone.
+      # [skip ci] prevents the push from re-triggering the CI workflow.
+      # On push rejection (concurrent race), rebases once on latest main before retrying.
+      # Skipped entirely when SKIP_BUMP=true.
+      - name: "📝 Commit: Push Version Bump to main"
+        if: env.SKIP_BUMP != 'true'
+        run: |
+          set -euo pipefail
+          RELEASE_DATE=$(TZ="Asia/Kolkata" date +'%-d %B %Y')
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add metadata.rb
+          git commit -m "chore(version): bump to ${{ github.event.inputs.version }}, ${RELEASE_DATE} [skip ci]"
+
+          # Retry once with rebase if another commit landed on main between checkout and push.
+          if ! git push origin main; then
+            echo "Push rejected — rebasing on latest main and retrying..."
+            git pull --rebase origin main
+            git push origin main
+          fi
+          echo "✅ Version bump committed and pushed."
+
+      # Installs Chef Workstation, which provides the knife CLI used to publish to Supermarket.
+      - name: "🔧 Setup: Install Chef Workstation"
         uses: actionshub/chef-install@2.0.4
-      - name: Create pem file
+
+      # Writes the Supermarket private key from secrets to disk.
+      # knife resolves this via .chef/config.rb (client_key '../newrelic.pem').
+      - name: "🔑 Auth: Write Chef Supermarket PEM Credential"
         run: echo "${{ secrets.newrelic_pem }}" > newrelic.pem
         shell: bash
-      - name: Release
+
+      # Packages the cookbook and uploads it to Chef Supermarket under the newrelic account.
+      # knife resolves cookbook path and credentials from .chef/config.rb.
+      - name: "📤 Publish: Share newrelic-install to Chef Supermarket"
         run: knife supermarket share newrelic-install
+        shell: bash
+
+      # Removes the PEM from disk unconditionally — runs even if the publish step failed.
+      # rm -f will not error if the file does not exist.
+      - name: "🧹 Cleanup: Remove PEM Credential from Disk"
+        if: always()
+        run: rm -f newrelic.pem
+        shell: bash
+
+      # Polls the public Supermarket REST API until the new version is confirmed live.
+      # Both dot (0.1.15) and underscore (0_1_15) formats are accepted by the API;
+      # dots are used here to keep the version string consistent throughout the workflow.
+      # Exits with ::warning:: on timeout rather than failing — publish already returned
+      # success; a polling timeout is not a release failure.
+      - name: "🔎 Verify: Confirm Version is Live on Chef Supermarket"
+        run: |
+          set -euo pipefail
+          VERSION="${{ github.event.inputs.version }}"
+          URL="https://supermarket.chef.io/api/v1/cookbooks/newrelic-install/versions/${VERSION}"
+          MAX_ATTEMPTS=12
+          ATTEMPT=0
+
+          echo "Polling Chef Supermarket for version '$VERSION'..."
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Version '$VERSION' is live: https://supermarket.chef.io/cookbooks/newrelic-install/versions/${VERSION}"
+              exit 0
+            fi
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS — HTTP $STATUS, not yet visible. Retrying in 10s..."
+            sleep 10
+          done
+
+          echo "::warning::⚠️ Version '$VERSION' not confirmed on Supermarket after $((MAX_ATTEMPTS * 10))s."
+          echo "::warning::   Publish step succeeded — propagation may still be in progress."
+          echo "::warning::   Check manually: https://supermarket.chef.io/cookbooks/newrelic-install"
         shell: bash

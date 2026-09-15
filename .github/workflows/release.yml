@@ -7,25 +7,22 @@
 #
 # Trigger: manually via Actions → Release → Run workflow.
 #
-# Version resolution:
-#   Leave `version` blank → workflow reads metadata.rb and auto-increments
-#   the patch by 1. The resolved version is shown clearly in the run log.
-#   Fill `version` explicitly → use that exact value (validated as before).
+# Two modes, controlled by the specify_version checkbox:
 #
-# Two modes, selected by skip_version_bump:
+#   specify_version = false  (default — auto-increment)
+#     The version field must be left blank. The workflow reads the current
+#     version from metadata.rb and increments the patch by 1 automatically.
 #
-#   skip_version_bump = false  (default — full automated release)
-#     Resolves version → validates it increments current → bumps metadata.rb
-#     → commits as github-actions[bot] via RELEASE_TOKEN → publishes → verifies.
+#   specify_version = true  (explicit version)
+#     The version field must be filled in with a valid 0.1.x value.
+#     Use this to jump ahead, re-release, or override the auto-increment.
 #
-#   skip_version_bump = true  (publish-only — version already on main)
-#     Resolves version → validates metadata.rb already contains exactly that
-#     version → skips bump/commit → publishes → verifies.
-#     Leave `version` blank here to publish whatever is currently on main.
+# Additionally, skip_version_bump skips the metadata.rb commit entirely
+# (use when the version is already on main and you only need to publish).
 #
-# RELEASE_TOKEN: a PAT owned by nr-developer-toolkit (repo admin), giving it
-# bypass privilege on the org-level Branch Protection ruleset. Required for
-# bump mode. Same mechanism as open-install-library.
+# RELEASE_TOKEN: PAT owned by nr-developer-toolkit (repo admin) — carries
+# bypass privilege on the org-level Branch Protection ruleset, matching
+# the mechanism used by the open-install-library release workflow.
 name: Release
 
 # contents: write — required to push the version-bump commit directly to main.
@@ -35,19 +32,24 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      version:
+      specify_version:
         description: >-
           📋 Updated Sep 2026: auto-bumps metadata.rb, commits as
           github-actions[bot], publishes & verifies — no manual PR needed.
-          Leave blank to auto-increment from the current version, or enter
-          a specific 0.1.x version to override.
+          Leave unchecked to auto-increment the patch. Check to enter a
+          specific version in the field below.
+        type: boolean
         required: false
+        default: false
+      version:
+        description: 'Explicit version (0.1.x) — only used when "Specify version" is checked above. Leave blank otherwise.'
         type: string
-        default: '0.1.22'
+        required: false
+        default: ''
       skip_version_bump:
         description: 'Skip metadata.rb bump — use when the version is already on main'
-        required: false
         type: boolean
+        required: false
         default: false
 
 jobs:
@@ -67,42 +69,56 @@ jobs:
           ref: main
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
-      # Determines the version to release and exports it as VERSION for all
-      # subsequent steps. Two sub-cases:
-      #   blank input + bump mode     → auto-increment patch from metadata.rb
-      #   blank input + publish-only  → use the current version in metadata.rb
-      #   explicit input              → use as-is (validated in the next step)
-      # The resolved version and direction are logged clearly for the operator.
+      # Resolves the version to release and exports it as VERSION for all
+      # subsequent steps. Enforces mutual exclusivity between the two modes:
+      #   specify_version=false → version field must be blank; auto-increment patch
+      #   specify_version=false + skip_version_bump=true → use current (no increment)
+      #   specify_version=true  → version field must be filled; use as-is
+      #   specify_version=true  + version field blank → hard fail
+      #   specify_version=false + version field filled → hard fail (contradictory)
       - name: "🔢 Resolve: Determine Release Version"
         run: |
           set -euo pipefail
+          SPECIFY="${{ github.event.inputs.specify_version }}"
           INPUT="${{ github.event.inputs.version }}"
           SKIP_BUMP="${{ github.event.inputs.skip_version_bump }}"
 
           CURRENT=$(grep -E "^version '" metadata.rb | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
           CURRENT_PATCH=$(echo "$CURRENT" | cut -d. -f3)
 
-          if [ -z "$INPUT" ]; then
-            if [ "$SKIP_BUMP" = "true" ]; then
-              # Blank + publish-only: publish whatever is currently on main.
-              VERSION="$CURRENT"
-              echo "ℹ️ No version specified — publish-only mode will publish current version: $VERSION"
-            else
-              # Blank + bump mode: auto-increment the patch.
-              VERSION="0.1.$((CURRENT_PATCH + 1))"
-              echo "ℹ️ No version specified — auto-incrementing: $CURRENT → $VERSION"
+          if [ "$SPECIFY" = "true" ]; then
+            # Explicit mode: version field must be provided.
+            if [ -z "$INPUT" ]; then
+              echo "::error::❌ 'Specify version' is checked but no version was entered."
+              echo "::error::   Fill in the version field (e.g. 0.1.$((CURRENT_PATCH + 1))), or uncheck to auto-increment."
+              exit 1
             fi
-          else
             VERSION="$INPUT"
-            echo "ℹ️ Version specified explicitly: $VERSION"
+            echo "ℹ️ Using explicit version: $VERSION"
+          else
+            # Auto mode: version field must be left blank.
+            if [ -n "$INPUT" ]; then
+              echo "::error::❌ A version was entered but 'Specify version' is not checked — contradictory inputs."
+              echo "::error::   Either check 'Specify version' to use '$INPUT', or clear the version field to auto-increment."
+              exit 1
+            fi
+            if [ "$SKIP_BUMP" = "true" ]; then
+              # Publish-only with auto: publish whatever is currently on main.
+              VERSION="$CURRENT"
+              echo "ℹ️ Auto + publish-only: using current version from metadata.rb: $VERSION"
+            else
+              # Full auto: increment the patch by 1.
+              VERSION="0.1.$((CURRENT_PATCH + 1))"
+              echo "ℹ️ Auto-incrementing: $CURRENT → $VERSION"
+            fi
           fi
 
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "CURRENT=$CURRENT" >> "$GITHUB_ENV"
 
       # Bump mode only: asserts RELEASE_TOKEN is present before making any changes.
-      # Gives an actionable error immediately rather than failing at push time with
-      # a generic GH013 after metadata.rb has already been modified on disk.
+      # Fails fast with an actionable message rather than reaching push time and
+      # hitting a generic GH013 error after metadata.rb has already been modified.
       - name: "🔐 Pre-flight: Verify RELEASE_TOKEN is Configured"
         if: github.event.inputs.skip_version_bump != 'true'
         env:
@@ -120,18 +136,19 @@ jobs:
 
       # Bump mode: validates VERSION strictly increments the current patch.
       # Publish-only mode: validates metadata.rb already contains exactly VERSION.
-      # Format guard (0.1.x) applies in both modes regardless of how version was resolved.
+      # Format guard (0.1.x) applies in both modes regardless of resolution path.
       - name: "🔍 Validate: Verify Version Against Mode and metadata.rb"
         run: |
           set -euo pipefail
           SKIP_BUMP="${{ github.event.inputs.skip_version_bump }}"
+          CURRENT_PATCH=$(echo "$CURRENT" | cut -d. -f3)
 
           # Format guard — applies in both modes.
           if ! echo "$VERSION" | grep -qE '^0\.1\.[0-9]+$'; then
             echo "::error::❌ Invalid version '$VERSION'."
             echo "::error::   Must follow the 0.1.x convention (x = non-negative integer)."
             echo "::error::   Current version in metadata.rb: $CURRENT"
-            echo "::error::   Next suggested version:         0.1.$(($(echo "$CURRENT" | cut -d. -f3) + 1))"
+            echo "::error::   Next suggested version:         0.1.$((CURRENT_PATCH + 1))"
             exit 1
           fi
 
@@ -146,7 +163,6 @@ jobs:
             echo "✅ Publish-only mode: metadata.rb confirmed at '$VERSION' — proceeding to publish."
           else
             # Bump mode: VERSION must strictly increment the current patch.
-            CURRENT_PATCH=$(echo "$CURRENT" | cut -d. -f3)
             INPUT_PATCH=$(echo "$VERSION" | cut -d. -f3)
             if [ "$INPUT_PATCH" -le "$CURRENT_PATCH" ]; then
               echo "::error::❌ '$VERSION' does not increment the current version '$CURRENT'."
@@ -159,7 +175,6 @@ jobs:
 
       # Rewrites the version line in metadata.rb and reads it back to confirm.
       # The read-back assertion catches silent no-ops if the line format ever drifts.
-      # Uses $VERSION from the Resolve step — works for both explicit and auto inputs.
       # Skipped when skip_version_bump=true.
       - name: "✏️ Bump: Update Version in metadata.rb"
         if: github.event.inputs.skip_version_bump != 'true'
@@ -229,9 +244,9 @@ jobs:
         run: rm -f newrelic.pem
 
       # Polls the public Supermarket REST API until the new version is confirmed live.
-      # Uses $VERSION resolved earlier — works for both blank and explicit inputs.
-      # A polling timeout exits with ::warning:: rather than failure — the publish step
-      # already returned success; propagation lag is not a release failure.
+      # Uses $VERSION resolved in the Resolve step — correct for both auto and explicit modes.
+      # A polling timeout exits with ::warning:: — publish already returned success;
+      # propagation lag is not a release failure.
       - name: "🔎 Verify: Confirm Version is Live on Chef Supermarket"
         run: |
           set -euo pipefail
@@ -254,39 +269,3 @@ jobs:
           echo "::warning::⚠️ Version '$VERSION' not confirmed on Supermarket after $((MAX_ATTEMPTS * 10))s."
           echo "::warning::   Publish step succeeded — propagation may still be in progress."
           echo "::warning::   Check manually: https://supermarket.chef.io/cookbooks/newrelic-install"
-
-      # After a successful bump-mode release, advances the default version in this
-      # workflow file to the next expected patch so the dispatch dialog is pre-filled
-      # correctly the next time someone triggers a release.
-      # Only runs in bump mode on overall success — skipped for publish-only runs
-      # since metadata.rb didn't change and the "next version" is unchanged.
-      - name: "🔄 Advance: Pre-fill Next Version in Dispatch Dialog"
-        if: success() && github.event.inputs.skip_version_bump != 'true'
-        run: |
-          set -euo pipefail
-          CURRENT_PATCH=$(echo "$VERSION" | cut -d. -f3)
-          NEXT="0.1.$((CURRENT_PATCH + 1))"
-
-          # Update the version input's default in this workflow file.
-          # Pattern matches any single-quoted string under the version input default:
-          # both the initial empty '' and previously set '0.1.x' values.
-          sed -i "s/^        default: '[0-9.]*'$/        default: '${NEXT}'/" .github/workflows/release.yml
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/workflows/release.yml
-
-          if git diff --cached --quiet; then
-            echo "ℹ️ Dispatch default already at '$NEXT' — no update needed."
-            exit 0
-          fi
-
-          git commit -m "chore(release): advance dispatch default to ${NEXT} [skip ci]"
-
-          # Retry once with rebase on concurrent push race.
-          if ! git push origin main; then
-            echo "Push rejected — rebasing and retrying..."
-            git pull --rebase origin main
-            git push origin main
-          fi
-          echo "✅ Dispatch dialog will now pre-fill '$NEXT' for the next release."

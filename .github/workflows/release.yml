@@ -35,6 +35,18 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      notice:
+        description: >-
+          📋 Release process updated September 2026 — this workflow now handles
+          everything automatically: bumps metadata.rb, commits as
+          github-actions[bot] via RELEASE_TOKEN, publishes to Chef Supermarket,
+          and verifies propagation. No manual version bump PR required.
+          Use skip_version_bump=true only if the version is already on main.
+        type: choice
+        required: false
+        default: Acknowledged
+        options:
+          - Acknowledged
       version:
         description: 'Version to release — must follow 0.1.x convention'
         required: true

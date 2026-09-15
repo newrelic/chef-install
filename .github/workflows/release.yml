@@ -7,25 +7,25 @@
 #
 # Trigger: manually via Actions → Release → Run workflow.
 #
-# Two modes, selected by the skip_version_bump boolean:
+# Version resolution:
+#   Leave `version` blank → workflow reads metadata.rb and auto-increments
+#   the patch by 1. The resolved version is shown clearly in the run log.
+#   Fill `version` explicitly → use that exact value (validated as before).
+#
+# Two modes, selected by skip_version_bump:
 #
 #   skip_version_bump = false  (default — full automated release)
-#     1. Validate version format and that it increments the current patch.
-#     2. Assert RELEASE_TOKEN is configured (required for the direct push).
-#     3. Bump metadata.rb, commit as github-actions[bot], push directly to main.
-#     4. Publish to Chef Supermarket; poll API until the version is live.
+#     Resolves version → validates it increments current → bumps metadata.rb
+#     → commits as github-actions[bot] via RELEASE_TOKEN → publishes → verifies.
 #
 #   skip_version_bump = true  (publish-only — version already on main)
-#     1. Validate format; assert metadata.rb already contains exactly the
-#        requested version — hard-fail with a mismatch error if not.
-#     2. Skip bump and commit entirely.
-#     3. Publish to Chef Supermarket; poll API until the version is live.
+#     Resolves version → validates metadata.rb already contains exactly that
+#     version → skips bump/commit → publishes → verifies.
+#     Leave `version` blank here to publish whatever is currently on main.
 #
-# Direct push to main (bump mode) requires RELEASE_TOKEN — a PAT owned by
-# nr-developer-toolkit, which has admin access and therefore bypass privilege
-# on the org-level Branch Protection ruleset. This is the same mechanism used
-# by the open-install-library release workflow. Without it the push is rejected
-# by GitHub with error GH013.
+# RELEASE_TOKEN: a PAT owned by nr-developer-toolkit (repo admin), giving it
+# bypass privilege on the org-level Branch Protection ruleset. Required for
+# bump mode. Same mechanism as open-install-library.
 name: Release
 
 # contents: write — required to push the version-bump commit directly to main.
@@ -37,10 +37,11 @@ on:
     inputs:
       version:
         description: >-
-          📋 Updated Sep 2026: auto-bumps metadata.rb, commits, publishes &
-          verifies — no manual PR needed. Must follow 0.1.x convention.
-        required: true
+          📋 Sep 2026: auto-bumps, commits & publishes — no manual PR needed.
+          Leave blank to auto-increment, or enter a specific 0.1.x version.
+        required: false
         type: string
+        default: ''
       skip_version_bump:
         description: 'Skip metadata.rb bump — use when the version is already on main'
         required: false
@@ -64,6 +65,39 @@ jobs:
           ref: main
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
+      # Determines the version to release and exports it as VERSION for all
+      # subsequent steps. Two sub-cases:
+      #   blank input + bump mode     → auto-increment patch from metadata.rb
+      #   blank input + publish-only  → use the current version in metadata.rb
+      #   explicit input              → use as-is (validated in the next step)
+      # The resolved version and direction are logged clearly for the operator.
+      - name: "🔢 Resolve: Determine Release Version"
+        run: |
+          set -euo pipefail
+          INPUT="${{ github.event.inputs.version }}"
+          SKIP_BUMP="${{ github.event.inputs.skip_version_bump }}"
+
+          CURRENT=$(grep -E "^version '" metadata.rb | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          CURRENT_PATCH=$(echo "$CURRENT" | cut -d. -f3)
+
+          if [ -z "$INPUT" ]; then
+            if [ "$SKIP_BUMP" = "true" ]; then
+              # Blank + publish-only: publish whatever is currently on main.
+              VERSION="$CURRENT"
+              echo "ℹ️ No version specified — publish-only mode will publish current version: $VERSION"
+            else
+              # Blank + bump mode: auto-increment the patch.
+              VERSION="0.1.$((CURRENT_PATCH + 1))"
+              echo "ℹ️ No version specified — auto-incrementing: $CURRENT → $VERSION"
+            fi
+          else
+            VERSION="$INPUT"
+            echo "ℹ️ Version specified explicitly: $VERSION"
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "CURRENT=$CURRENT" >> "$GITHUB_ENV"
+
       # Bump mode only: asserts RELEASE_TOKEN is present before making any changes.
       # Gives an actionable error immediately rather than failing at push time with
       # a generic GH013 after metadata.rb has already been modified on disk.
@@ -82,39 +116,35 @@ jobs:
           fi
           echo "✅ RELEASE_TOKEN is present — push will authenticate as nr-developer-toolkit."
 
-      # Bump mode: validates input is strictly greater than the current patch version.
-      # Publish-only mode: validates that metadata.rb already contains exactly the
-      # requested version — rejects with a mismatch error if not.
-      # Format guard (0.1.x convention) applies in both modes.
+      # Bump mode: validates VERSION strictly increments the current patch.
+      # Publish-only mode: validates metadata.rb already contains exactly VERSION.
+      # Format guard (0.1.x) applies in both modes regardless of how version was resolved.
       - name: "🔍 Validate: Verify Version Against Mode and metadata.rb"
         run: |
           set -euo pipefail
-          VERSION="${{ github.event.inputs.version }}"
           SKIP_BUMP="${{ github.event.inputs.skip_version_bump }}"
-
-          CURRENT=$(grep -E "^version '" metadata.rb | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
-          CURRENT_PATCH=$(echo "$CURRENT" | cut -d. -f3)
 
           # Format guard — applies in both modes.
           if ! echo "$VERSION" | grep -qE '^0\.1\.[0-9]+$'; then
             echo "::error::❌ Invalid version '$VERSION'."
             echo "::error::   Must follow the 0.1.x convention (x = non-negative integer)."
             echo "::error::   Current version in metadata.rb: $CURRENT"
-            echo "::error::   Next suggested version:         0.1.$((CURRENT_PATCH + 1))"
+            echo "::error::   Next suggested version:         0.1.$(($(echo "$CURRENT" | cut -d. -f3) + 1))"
             exit 1
           fi
 
           if [ "$SKIP_BUMP" = "true" ]; then
-            # Publish-only: metadata.rb must already be at exactly this version.
+            # Publish-only: metadata.rb must already be at exactly VERSION.
             if [ "$VERSION" != "$CURRENT" ]; then
-              echo "::error::❌ Version mismatch — requested '$VERSION' but metadata.rb is at '$CURRENT'."
+              echo "::error::❌ Version mismatch — resolved '$VERSION' but metadata.rb is at '$CURRENT'."
               echo "::error::   Merge a version bump PR to main first, then re-run with skip_version_bump=true."
               echo "::error::   Or re-run with skip_version_bump=false to let the workflow bump it automatically."
               exit 1
             fi
             echo "✅ Publish-only mode: metadata.rb confirmed at '$VERSION' — proceeding to publish."
           else
-            # Bump mode: input must strictly increment the current patch.
+            # Bump mode: VERSION must strictly increment the current patch.
+            CURRENT_PATCH=$(echo "$CURRENT" | cut -d. -f3)
             INPUT_PATCH=$(echo "$VERSION" | cut -d. -f3)
             if [ "$INPUT_PATCH" -le "$CURRENT_PATCH" ]; then
               echo "::error::❌ '$VERSION' does not increment the current version '$CURRENT'."
@@ -127,16 +157,17 @@ jobs:
 
       # Rewrites the version line in metadata.rb and reads it back to confirm.
       # The read-back assertion catches silent no-ops if the line format ever drifts.
+      # Uses $VERSION from the Resolve step — works for both explicit and auto inputs.
       # Skipped when skip_version_bump=true.
       - name: "✏️ Bump: Update Version in metadata.rb"
         if: github.event.inputs.skip_version_bump != 'true'
         run: |
           set -euo pipefail
-          sed -i "s/^version '.*'/version '${{ github.event.inputs.version }}'/" metadata.rb
+          sed -i "s/^version '.*'/version '${VERSION}'/" metadata.rb
 
           WRITTEN=$(grep -E "^version '" metadata.rb | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
-          if [ "$WRITTEN" != "${{ github.event.inputs.version }}" ]; then
-            echo "::error::❌ Write verification failed — metadata.rb shows '$WRITTEN', expected '${{ github.event.inputs.version }}'."
+          if [ "$WRITTEN" != "$VERSION" ]; then
+            echo "::error::❌ Write verification failed — metadata.rb shows '$WRITTEN', expected '$VERSION'."
             exit 1
           fi
           echo "✅ metadata.rb updated to '$WRITTEN'."
@@ -155,7 +186,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add metadata.rb
-          git commit -m "chore(version): bump to ${{ github.event.inputs.version }}, ${RELEASE_DATE} [skip ci]"
+          git commit -m "chore(version): bump to ${VERSION}, ${RELEASE_DATE} [skip ci]"
 
           # Retry once with rebase if another commit landed on main between checkout and push.
           if ! git push origin main; then
@@ -196,14 +227,12 @@ jobs:
         run: rm -f newrelic.pem
 
       # Polls the public Supermarket REST API until the new version is confirmed live.
-      # Both dot (0.1.x) and underscore (0_1_x) formats are accepted by the API;
-      # dots are used here for consistency with the version string throughout this file.
+      # Uses $VERSION resolved earlier — works for both blank and explicit inputs.
       # A polling timeout exits with ::warning:: rather than failure — the publish step
       # already returned success; propagation lag is not a release failure.
       - name: "🔎 Verify: Confirm Version is Live on Chef Supermarket"
         run: |
           set -euo pipefail
-          VERSION="${{ github.event.inputs.version }}"
           URL="https://supermarket.chef.io/api/v1/cookbooks/newrelic-install/versions/${VERSION}"
           MAX_ATTEMPTS=12
           ATTEMPT=0

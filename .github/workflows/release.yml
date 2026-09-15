@@ -5,21 +5,30 @@
 
 # Release workflow for the newrelic-install Chef cookbook.
 #
-# Trigger : manually via Actions → Release → Run workflow.
-# Pipeline: validate input → bump metadata.rb on main → publish to Chef
-#           Supermarket via knife → poll Supermarket API to confirm propagation.
+# Trigger: manually via Actions → Release → Run workflow.
 #
-# Re-run safety: if a previous run committed the version bump but knife failed,
-# re-running with the same version skips the bump/commit and goes straight to
-# publish — no manual cleanup required.
+# Two modes, selected by the skip_version_bump boolean:
 #
-# Branch-protection note: if main requires PR reviews, set a repo-scoped PAT as
-# the RELEASE_TOKEN secret and add its owner as a branch-rule bypass actor.
-# Without it the bot push will be rejected with HTTP 403. Repos without branch
-# protection work with the default GITHUB_TOKEN.
+#   skip_version_bump = false  (default — full automated release)
+#     1. Validate version format and that it increments the current patch.
+#     2. Assert RELEASE_TOKEN is configured (required for the direct push).
+#     3. Bump metadata.rb, commit as github-actions[bot], push directly to main.
+#     4. Publish to Chef Supermarket; poll API until the version is live.
+#
+#   skip_version_bump = true  (publish-only — version already on main)
+#     1. Validate format; assert metadata.rb already contains exactly the
+#        requested version — hard-fail with a mismatch error if not.
+#     2. Skip bump and commit entirely.
+#     3. Publish to Chef Supermarket; poll API until the version is live.
+#
+# Direct push to main (bump mode) requires RELEASE_TOKEN — a PAT owned by
+# nr-developer-toolkit, which has admin access and therefore bypass privilege
+# on the org-level Branch Protection ruleset. This is the same mechanism used
+# by the open-install-library release workflow. Without it the push is rejected
+# by GitHub with error GH013.
 name: Release
 
-# Minimum scope — only the bot commit to main requires write access.
+# contents: write — required to push the version-bump commit directly to main.
 permissions:
   contents: write
 
@@ -27,86 +36,116 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release — must follow 0.1.x (e.g. 0.1.15)'
+        description: 'Version to release — must follow 0.1.x convention'
         required: true
         type: string
+      skip_version_bump:
+        description: 'Skip metadata.rb bump — use when the version is already on main'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     name: "🚀 Release: Publish newrelic-install to Chef Supermarket"
-    # Generous ceiling: Chef Workstation install + knife + 2-min Supermarket poll.
+    # Chef Workstation install (~1 min) + optional commit + knife + 2-min Supermarket poll.
     timeout-minutes: 15
     steps:
-      # Checks out main so every step operates on the latest committed state.
-      # Prefers RELEASE_TOKEN (PAT) over GITHUB_TOKEN for branch-protected repos.
+      # Shallow clone of main is sufficient — we only read and write one file.
+      # RELEASE_TOKEN authenticates the subsequent push as nr-developer-toolkit
+      # (admin, bypass privilege on the org ruleset). Falls back to GITHUB_TOKEN
+      # for publish-only mode where no push to main occurs.
       - name: "📦 Checkout: Fetch main at HEAD"
         uses: actions/checkout@v4
         with:
+          ref: main
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
-      # Validates format (must be 0.1.x) and direction (must increment the patch).
-      # On failure, GitHub renders ::error:: lines as red annotations in the UI.
-      # Equal-to-current sets SKIP_BUMP=true instead of failing — this is the safe
-      # re-run path when a prior run committed the bump but knife subsequently failed.
-      - name: "🔍 Validate: Verify Version Format and Monotonic Increment"
+      # Bump mode only: asserts RELEASE_TOKEN is present before making any changes.
+      # Gives an actionable error immediately rather than failing at push time with
+      # a generic GH013 after metadata.rb has already been modified on disk.
+      - name: "🔐 Pre-flight: Verify RELEASE_TOKEN is Configured"
+        if: github.event.inputs.skip_version_bump != 'true'
+        env:
+          RELEASE_TOKEN_SET: ${{ secrets.RELEASE_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          if [ "$RELEASE_TOKEN_SET" != "true" ]; then
+            echo "::error::❌ RELEASE_TOKEN is not configured for this repository."
+            echo "::error::   Bump mode requires a PAT owned by a repo admin (nr-developer-toolkit)."
+            echo "::error::   Add it at: https://github.com/newrelic/chef-install/settings/secrets/actions"
+            echo "::error::   Alternatively, merge the version bump manually and re-run with skip_version_bump=true."
+            exit 1
+          fi
+          echo "✅ RELEASE_TOKEN is present — push will authenticate as nr-developer-toolkit."
+
+      # Bump mode: validates input is strictly greater than the current patch version.
+      # Publish-only mode: validates that metadata.rb already contains exactly the
+      # requested version — rejects with a mismatch error if not.
+      # Format guard (0.1.x convention) applies in both modes.
+      - name: "🔍 Validate: Verify Version Against Mode and metadata.rb"
         run: |
           set -euo pipefail
           VERSION="${{ github.event.inputs.version }}"
+          SKIP_BUMP="${{ github.event.inputs.skip_version_bump }}"
 
-          # Read the version currently committed on main.
           CURRENT=$(grep -E "^version '" metadata.rb | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
           CURRENT_PATCH=$(echo "$CURRENT" | cut -d. -f3)
-          SUGGESTED="0.1.$((CURRENT_PATCH + 1))"
 
-          # Reject anything outside the strict 0.1.x convention.
+          # Format guard — applies in both modes.
           if ! echo "$VERSION" | grep -qE '^0\.1\.[0-9]+$'; then
             echo "::error::❌ Invalid version '$VERSION'."
             echo "::error::   Must follow the 0.1.x convention (x = non-negative integer)."
             echo "::error::   Current version in metadata.rb: $CURRENT"
-            echo "::error::   Next suggested version:         $SUGGESTED"
+            echo "::error::   Next suggested version:         0.1.$((CURRENT_PATCH + 1))"
             exit 1
           fi
 
-          INPUT_PATCH=$(echo "$VERSION" | cut -d. -f3)
-
-          if [ "$INPUT_PATCH" -eq "$CURRENT_PATCH" ]; then
-            # Version already on main — a prior run bumped it but publish failed.
-            # Skip bump and commit; proceed directly to publish.
-            echo "::warning::⚠️ '$VERSION' already set in metadata.rb — skipping bump, proceeding to publish."
-            echo "SKIP_BUMP=true" >> "$GITHUB_ENV"
-          elif [ "$INPUT_PATCH" -lt "$CURRENT_PATCH" ]; then
-            echo "::error::❌ '$VERSION' is behind the current version '$CURRENT'."
-            echo "::error::   Patch number must exceed $CURRENT_PATCH."
-            echo "::error::   Next suggested version: $SUGGESTED"
-            exit 1
+          if [ "$SKIP_BUMP" = "true" ]; then
+            # Publish-only: metadata.rb must already be at exactly this version.
+            if [ "$VERSION" != "$CURRENT" ]; then
+              echo "::error::❌ Version mismatch — requested '$VERSION' but metadata.rb is at '$CURRENT'."
+              echo "::error::   Merge a version bump PR to main first, then re-run with skip_version_bump=true."
+              echo "::error::   Or re-run with skip_version_bump=false to let the workflow bump it automatically."
+              exit 1
+            fi
+            echo "✅ Publish-only mode: metadata.rb confirmed at '$VERSION' — proceeding to publish."
           else
-            echo "✅ Version '$VERSION' is valid — releasing $CURRENT → $VERSION."
+            # Bump mode: input must strictly increment the current patch.
+            INPUT_PATCH=$(echo "$VERSION" | cut -d. -f3)
+            if [ "$INPUT_PATCH" -le "$CURRENT_PATCH" ]; then
+              echo "::error::❌ '$VERSION' does not increment the current version '$CURRENT'."
+              echo "::error::   Patch number must exceed $CURRENT_PATCH."
+              echo "::error::   Next suggested version: 0.1.$((CURRENT_PATCH + 1))"
+              exit 1
+            fi
+            echo "✅ Bump mode: '$VERSION' is valid — releasing $CURRENT → $VERSION."
           fi
 
-      # Rewrites the version line in metadata.rb and reads it back to confirm the write.
-      # Skipped entirely when SKIP_BUMP=true (version already on main).
+      # Rewrites the version line in metadata.rb and reads it back to confirm.
+      # The read-back assertion catches silent no-ops if the line format ever drifts.
+      # Skipped when skip_version_bump=true.
       - name: "✏️ Bump: Update Version in metadata.rb"
-        if: env.SKIP_BUMP != 'true'
+        if: github.event.inputs.skip_version_bump != 'true'
         run: |
           set -euo pipefail
           sed -i "s/^version '.*'/version '${{ github.event.inputs.version }}'/" metadata.rb
 
-          # Read-back assertion — catches silent no-ops if the line format ever drifts.
           WRITTEN=$(grep -E "^version '" metadata.rb | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
           if [ "$WRITTEN" != "${{ github.event.inputs.version }}" ]; then
             echo "::error::❌ Write verification failed — metadata.rb shows '$WRITTEN', expected '${{ github.event.inputs.version }}'."
             exit 1
           fi
-          echo "✅ metadata.rb confirmed at version '$WRITTEN'."
+          echo "✅ metadata.rb updated to '$WRITTEN'."
 
-      # Commits the metadata.rb change as github-actions[bot] and pushes directly to main.
-      # Release date is stamped in IST to match the team's timezone.
-      # [skip ci] prevents the push from re-triggering the CI workflow.
-      # On push rejection (concurrent race), rebases once on latest main before retrying.
-      # Skipped entirely when SKIP_BUMP=true.
+      # Commits as github-actions[bot] and pushes directly to main via RELEASE_TOKEN.
+      # Authentication is as nr-developer-toolkit (admin bypass); authorship is set
+      # separately via git config and shows as github-actions[bot] in the commit log.
+      # Release date is stamped in IST. [skip ci] prevents CI re-running on this commit.
+      # Skipped when skip_version_bump=true.
       - name: "📝 Commit: Push Version Bump to main"
-        if: env.SKIP_BUMP != 'true'
+        if: github.event.inputs.skip_version_bump != 'true'
         run: |
           set -euo pipefail
           RELEASE_DATE=$(TZ="Asia/Kolkata" date +'%-d %B %Y')
@@ -124,34 +163,41 @@ jobs:
           fi
           echo "✅ Version bump committed and pushed."
 
-      # Installs Chef Workstation, which provides the knife CLI used to publish to Supermarket.
+      # Installs Chef Workstation, providing the knife CLI used to publish to Supermarket.
       - name: "🔧 Setup: Install Chef Workstation"
         uses: actionshub/chef-install@2.0.4
 
-      # Writes the Supermarket private key from secrets to disk.
-      # knife resolves this via .chef/config.rb (client_key '../newrelic.pem').
+      # Writes the Supermarket RSA private key from secrets to disk.
+      # Uses env: so the secret value is not interpolated directly into the script.
+      # knife resolves this path via .chef/config.rb (client_key '../newrelic.pem').
       - name: "🔑 Auth: Write Chef Supermarket PEM Credential"
-        run: echo "${{ secrets.newrelic_pem }}" > newrelic.pem
-        shell: bash
+        env:
+          NEWRELIC_PEM: ${{ secrets.NEWRELIC_PEM }}
+        run: |
+          set -euo pipefail
+          if [ -z "$NEWRELIC_PEM" ]; then
+            echo "::error::❌ NEWRELIC_PEM secret is not configured."
+            exit 1
+          fi
+          echo "$NEWRELIC_PEM" > newrelic.pem
 
       # Packages the cookbook and uploads it to Chef Supermarket under the newrelic account.
-      # knife resolves cookbook path and credentials from .chef/config.rb.
+      # knife reads version and credentials from local files — metadata.rb is always
+      # at the correct version by the time this step runs.
       - name: "📤 Publish: Share newrelic-install to Chef Supermarket"
         run: knife supermarket share newrelic-install
-        shell: bash
 
-      # Removes the PEM from disk unconditionally — runs even if the publish step failed.
+      # Removes the PEM from disk unconditionally — runs even if publish fails.
       # rm -f will not error if the file does not exist.
       - name: "🧹 Cleanup: Remove PEM Credential from Disk"
         if: always()
         run: rm -f newrelic.pem
-        shell: bash
 
       # Polls the public Supermarket REST API until the new version is confirmed live.
-      # Both dot (0.1.15) and underscore (0_1_15) formats are accepted by the API;
-      # dots are used here to keep the version string consistent throughout the workflow.
-      # Exits with ::warning:: on timeout rather than failing — publish already returned
-      # success; a polling timeout is not a release failure.
+      # Both dot (0.1.x) and underscore (0_1_x) formats are accepted by the API;
+      # dots are used here for consistency with the version string throughout this file.
+      # A polling timeout exits with ::warning:: rather than failure — the publish step
+      # already returned success; propagation lag is not a release failure.
       - name: "🔎 Verify: Confirm Version is Live on Chef Supermarket"
         run: |
           set -euo pipefail
@@ -175,4 +221,3 @@ jobs:
           echo "::warning::⚠️ Version '$VERSION' not confirmed on Supermarket after $((MAX_ATTEMPTS * 10))s."
           echo "::warning::   Publish step succeeded — propagation may still be in progress."
           echo "::warning::   Check manually: https://supermarket.chef.io/cookbooks/newrelic-install"
-        shell: bash

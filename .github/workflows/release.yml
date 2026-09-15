@@ -37,11 +37,13 @@ on:
     inputs:
       version:
         description: >-
-          📋 Sep 2026: auto-bumps, commits & publishes — no manual PR needed.
-          Leave blank to auto-increment, or enter a specific 0.1.x version.
+          📋 Updated Sep 2026: auto-bumps metadata.rb, commits as
+          github-actions[bot], publishes & verifies — no manual PR needed.
+          Leave blank to auto-increment from the current version, or enter
+          a specific 0.1.x version to override.
         required: false
         type: string
-        default: ''
+        default: '0.1.22'
       skip_version_bump:
         description: 'Skip metadata.rb bump — use when the version is already on main'
         required: false
@@ -252,3 +254,39 @@ jobs:
           echo "::warning::⚠️ Version '$VERSION' not confirmed on Supermarket after $((MAX_ATTEMPTS * 10))s."
           echo "::warning::   Publish step succeeded — propagation may still be in progress."
           echo "::warning::   Check manually: https://supermarket.chef.io/cookbooks/newrelic-install"
+
+      # After a successful bump-mode release, advances the default version in this
+      # workflow file to the next expected patch so the dispatch dialog is pre-filled
+      # correctly the next time someone triggers a release.
+      # Only runs in bump mode on overall success — skipped for publish-only runs
+      # since metadata.rb didn't change and the "next version" is unchanged.
+      - name: "🔄 Advance: Pre-fill Next Version in Dispatch Dialog"
+        if: success() && github.event.inputs.skip_version_bump != 'true'
+        run: |
+          set -euo pipefail
+          CURRENT_PATCH=$(echo "$VERSION" | cut -d. -f3)
+          NEXT="0.1.$((CURRENT_PATCH + 1))"
+
+          # Update the version input's default in this workflow file.
+          # Pattern matches any single-quoted string under the version input default:
+          # both the initial empty '' and previously set '0.1.x' values.
+          sed -i "s/^        default: '[0-9.]*'$/        default: '${NEXT}'/" .github/workflows/release.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/release.yml
+
+          if git diff --cached --quiet; then
+            echo "ℹ️ Dispatch default already at '$NEXT' — no update needed."
+            exit 0
+          fi
+
+          git commit -m "chore(release): advance dispatch default to ${NEXT} [skip ci]"
+
+          # Retry once with rebase on concurrent push race.
+          if ! git push origin main; then
+            echo "Push rejected — rebasing and retrying..."
+            git pull --rebase origin main
+            git push origin main
+          fi
+          echo "✅ Dispatch dialog will now pre-fill '$NEXT' for the next release."

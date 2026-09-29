@@ -97,12 +97,11 @@ default['newrelic_install']['env']['NEW_RELIC_APPLICATION_NAME'] = ''
 # NRDOT MSSQL, ORACLE #
 #######################
 
-# nrdot-collector-mssql and nrdot-collector-mssql-rds now configure one
-# collector against one or more instances via an instances file plus a
-# secrets file, same shape as MySQL/PostgreSQL above. The winauth variants
-# below are unchanged (still single-instance) and env vars still vary by
-# variant, so no defaults are declared here. Set only the vars needed for
-# your chosen target via env attribute overrides.
+# nrdot-collector-mssql, nrdot-collector-mssql-rds, nrdot-collector-mssql-winauth
+# and nrdot-collector-mssql-rds-winauth all configure one collector against one
+# or more instances via an instances file (host/port per instance). Env vars
+# vary by variant, so no defaults are declared here. Set only the vars needed
+# for your chosen target via env attribute overrides.
 #
 # nrdot-collector-mssql:
 #   NR_CLI_MSSQL_CONFIG_PRESET, NR_CLI_MSSQL_INSTANCES_FILE, NR_CLI_MSSQL_SECRETS_FILE
@@ -112,9 +111,19 @@ default['newrelic_install']['env']['NEW_RELIC_APPLICATION_NAME'] = ''
 #   NR_CLI_MSSQL_CONFIG_PRESET, NR_CLI_MSSQL_INSTANCES_FILE, NR_CLI_MSSQL_SECRETS_FILE
 #   secrets file per instance <i>: NR_CLI_MSSQL_ADMIN_USER_<i>, NR_CLI_MSSQL_ADMIN_PASSWORD_<i> (RDS master creds)
 #
-# nrdot-collector-mssql-winauth / nrdot-collector-mssql-rds-winauth:
-#   NR_CLI_MSSQL_AUTH_MODE, NR_CLI_MSSQL_WIN_ACCOUNT, NR_CLI_MSSQL_WIN_PASSWORD,
-#   NR_CLI_MSSQL_GMSA_ACCOUNT (plus server/port/preset above)
+# nrdot-collector-mssql-winauth:
+#   NR_CLI_MSSQL_CONFIG_PRESET, NR_CLI_MSSQL_AUTH_MODE, NR_CLI_MSSQL_WINAUTH_LOCATION,
+#   NR_CLI_MSSQL_INSTANCES_FILE (host/port per instance, no secrets file - one Windows
+#   identity monitors every instance in the file)
+#   NR_CLI_MSSQL_WIN_ACCOUNT, NR_CLI_MSSQL_WIN_PASSWORD (Windows Domain Auth, different
+#   host only), NR_CLI_MSSQL_GMSA_ACCOUNT (gMSA only)
+#
+# nrdot-collector-mssql-rds-winauth:
+#   NR_CLI_MSSQL_CONFIG_PRESET, NR_CLI_MSSQL_AUTH_MODE,
+#   NR_CLI_MSSQL_INSTANCES_FILE (host/port per instance, no secrets file - one Windows
+#   identity monitors every instance in the file)
+#   NR_CLI_MSSQL_WIN_ACCOUNT, NR_CLI_MSSQL_WIN_PASSWORD (Windows Domain Auth only),
+#   NR_CLI_MSSQL_GMSA_ACCOUNT (gMSA only)
 #
 # nrdot-collector-oracle:
 #   NR_CLI_ORACLE_CONFIG_PRESET, NR_CLI_ORACLE_INSTANCES_FILE
@@ -137,5 +146,6 @@ default['newrelic_install']['env']['NEW_RELIC_APPLICATION_NAME'] = ''
 #
 # A bad instance (wrong password, unsupported version, failed user setup) is
 # skipped with a logged reason rather than aborting the whole install.
-# See https://github.com/newrelic/open-install-library/pull/1434
+# See https://github.com/newrelic/open-install-library/pull/1434 and
+# https://github.com/newrelic/open-install-library/pull/1440 (winauth variants)
 # for the authoritative recipe definitions (open at time of writing).

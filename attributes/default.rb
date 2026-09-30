@@ -75,7 +75,6 @@ default['newrelic_install']['env']['NEW_RELIC_APPLICATION_NAME'] = ''
 #
 # nrdot-collector-mysql-rds:
 #   NR_CLI_MYSQL_CONFIG_PRESET, NR_CLI_MYSQL_INSTANCES_FILE, NR_CLI_MYSQL_SECRETS_FILE
-#   (optional: NR_CLI_MYSQL_TLS_CA_FILE)
 #   secrets file per instance <i>: NR_CLI_MYSQL_ADMIN_USER_<i>, NR_CLI_MYSQL_ADMIN_PASSWORD_<i> (RDS master creds)
 #
 # nrdot-collector-postgresql:

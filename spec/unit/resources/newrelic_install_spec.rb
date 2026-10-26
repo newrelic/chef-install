@@ -108,7 +108,6 @@ describe 'newrelic-install::default' do
       expect(subject).to run_execute('newrelic install').with(command: include('NEW_RELIC_ACCOUNT_ID'))
       expect(subject).to run_execute('newrelic install').with(command: include('NEW_RELIC_REGION'))
     end
-
   end
 
   context 'when env contains additional vars' do

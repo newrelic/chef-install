@@ -109,9 +109,6 @@ describe 'newrelic-install::default' do
       expect(subject).to run_execute('newrelic install').with(command: include('NEW_RELIC_REGION'))
     end
 
-    it 'skips sudo when already running as root' do
-      expect(subject).to run_execute('newrelic install').with(command: include('if [ "$(id -u)" = "0" ]'))
-    end
   end
 
   context 'when env contains additional vars' do

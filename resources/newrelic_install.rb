@@ -28,8 +28,17 @@ action :install do
       timeout new_resource.timeout_seconds
     end
   else
+    env_vars = %w(NEW_RELIC_API_KEY NEW_RELIC_ACCOUNT_ID NEW_RELIC_REGION)
+    env_vars += new_resource.env.keys if new_resource.env && !new_resource.env.empty?
+    preserve_env_arg = "--preserve-env=#{env_vars.join(',')}"
+
     execute 'newrelic install' do
-      command "curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && sudo -E /usr/local/bin/newrelic install #{options}"
+      command "curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && " \
+              "if [ \"$(id -u)\" = \"0\" ]; then " \
+              "/usr/local/bin/newrelic install #{options}; " \
+              "else " \
+              "sudo #{preserve_env_arg} /usr/local/bin/newrelic install #{options}; " \
+              "fi"
       live_stream true
       environment new_resource.env
       timeout new_resource.timeout_seconds

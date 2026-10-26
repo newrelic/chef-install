@@ -33,12 +33,12 @@ action :install do
     preserve_env_arg = "--preserve-env=#{env_vars.join(',')}"
 
     execute 'newrelic install' do
-      command "curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && " \
-              "if [ \"$(id -u)\" = \"0\" ]; then " \
+      command 'curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && ' \
+              'if [ "$(id -u)" = "0" ]; then ' \
               "/usr/local/bin/newrelic install #{options}; " \
-              "else " \
+              'else ' \
               "sudo #{preserve_env_arg} /usr/local/bin/newrelic install #{options}; " \
-              "fi"
+              'fi'
       live_stream true
       environment new_resource.env
       timeout new_resource.timeout_seconds

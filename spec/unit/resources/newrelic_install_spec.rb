@@ -97,6 +97,29 @@ describe 'newrelic-install::default' do
     it 'run bash newrelic install command with infra' do
       expect(subject).to run_execute('newrelic install').with(command: include('infrastructure-agent-installer'))
     end
+
+    it 'uses --preserve-env instead of sudo -E' do
+      expect(subject).to run_execute('newrelic install').with(command: include('--preserve-env='))
+      expect(subject).not_to run_execute('newrelic install').with(command: include('sudo -E'))
+    end
+
+    it 'includes core NR env vars in --preserve-env list' do
+      expect(subject).to run_execute('newrelic install').with(command: include('NEW_RELIC_API_KEY'))
+      expect(subject).to run_execute('newrelic install').with(command: include('NEW_RELIC_ACCOUNT_ID'))
+      expect(subject).to run_execute('newrelic install').with(command: include('NEW_RELIC_REGION'))
+    end
+  end
+
+  context 'when env contains additional vars' do
+    default_attributes['newrelic_install']['NEW_RELIC_API_KEY'] = 'xxx'
+    default_attributes['newrelic_install']['NEW_RELIC_ACCOUNT_ID'] = 'xxx'
+    default_attributes['newrelic_install']['NEW_RELIC_REGION'] = 'xxx'
+    default_attributes['newrelic_install']['targets'] = ['infrastructure-agent-installer']
+    default_attributes['newrelic_install']['env']['HTTPS_PROXY'] = 'http://proxy.example.com:8080'
+
+    it 'includes extra env vars in --preserve-env list' do
+      expect(subject).to run_execute('newrelic install').with(command: include('HTTPS_PROXY'))
+    end
   end
 
   context 'when targets only contains infra, logs and php' do

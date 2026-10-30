@@ -28,8 +28,18 @@ action :install do
       timeout new_resource.timeout_seconds
     end
   else
+    env_vars = %w(NEW_RELIC_API_KEY NEW_RELIC_ACCOUNT_ID NEW_RELIC_REGION)
+    env_vars += new_resource.env.keys if new_resource.env && !new_resource.env.empty?
+    # --preserve-env=LIST replaces -E: supported by classic sudo >= 1.8.8 (Mar 2013) and by
+    # sudo-rs (Ubuntu 26.04+) which explicitly dropped -E. Every non-EOL platform we support
+    # ships sudo >= 1.8.8: Ubuntu 20.04+ (1.8.31), Debian 11+ (1.9.5), RHEL/CentOS 8+ (1.8.29),
+    # Amazon Linux 2+ (1.8.23), Oracle 8+ (1.8.29), SLES 15 (1.9.x). Only EOL distros
+    # (Debian 7, RHEL 5/6, Oracle 6, Amazon Linux 1) shipped sudo < 1.8.8 and are out of scope.
+    install_cmd = 'curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && ' \
+                  "sudo --preserve-env=#{env_vars.join(',')} /usr/local/bin/newrelic install #{options}"
+
     execute 'newrelic install' do
-      command "curl -Ls https://download.newrelic.com/install/newrelic-cli/scripts/install.sh | bash && sudo -E /usr/local/bin/newrelic install #{options}"
+      command install_cmd
       live_stream true
       environment new_resource.env
       timeout new_resource.timeout_seconds
